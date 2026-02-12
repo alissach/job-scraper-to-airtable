@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Scraper - Settings</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0a0a0b;
+      --surface: #141416;
+      --surface-hover: #1c1c1f;
+      --border: #27272a;
+      --border-focus: #3f3f46;
+      --text: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-muted: #71717a;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --success: #16a34a;
+      --success-bg: #052e16;
+      --error: #dc2626;
+      --error-bg: #450a0a;
+      --radius: 8px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      display: flex;
+      justify-content: center;
+      padding: 48px 24px;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+    }
+
+    /* Header */
+    .page-header {
+      margin-bottom: 32px;
+    }
+
+    .page-header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+
+    .page-header p {
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .card-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .card-desc a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .card-desc a:hover {
+      text-decoration: underline;
+    }
+
+    /* Form */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      border-color: var(--accent);
+    }
+
+    input[type="text"]::placeholder,
+    input[type="password"]::placeholder {
+      color: var(--text-muted);
+    }
+
+    .field-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    .field-hint code {
+      background: var(--surface-hover);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-family: "SF Mono", "Fira Code", monospace;
+    }
+
+    /* Buttons */
+    .button-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 24px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    /* Status */
+    .status {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      margin-top: 16px;
+    }
+
+    .status.active {
+      display: flex;
+    }
+
+    .status.success {
+      background: var(--success-bg);
+      color: #4ade80;
+      border: 1px solid #14532d;
+    }
+
+    .status.error {
+      background: var(--error-bg);
+      color: #f87171;
+      border: 1px solid #7f1d1d;
+    }
+
+    /* Help section */
+    .help-section {
+      margin-top: 24px;
+    }
+
+    .help-section h3 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text-secondary);
+    }
+
+    .help-steps {
+      list-style: none;
+      counter-reset: steps;
+    }
+
+    .help-steps li {
+      counter-increment: steps;
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .help-steps li::before {
+      content: counter(steps);
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface-hover);
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="page-header">
+      <h1>Job Scraper Settings</h1>
+      <p>Connect your Airtable base to start saving job postings.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Airtable Connection</div>
+      <div class="card-desc">
+        Your credentials are stored locally in Chrome and never sent anywhere except Airtable's API.
+      </div>
+
+      <div class="form-group">
+        <label for="token">Personal Access Token</label>
+        <input type="password" id="token" placeholder="pat_xxxxxxxxxxxxxxx" />
+        <div class="field-hint">
+          Generate one at <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">airtable.com/create/tokens</a>.
+          Needs <code>data.records:write</code> scope.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="baseId">Base ID</label>
+        <input type="text" id="baseId" placeholder="appXXXXXXXXXXXXXX" />
+        <div class="field-hint">
+          Find it in your Airtable base URL: <code>airtable.com/appXXXXX/...</code>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="tableName">Table Name</label>
+        <input type="text" id="tableName" placeholder="Job Postings" />
+        <div class="field-hint">
+          Exact name of the table tab in your base (case-sensitive).
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button class="btn btn-primary" id="saveBtn">Save Settings</button>
+        <button class="btn btn-secondary" id="testBtn">Test Connection</button>
+      </div>
+
+      <div class="status" id="status">
+        <span id="statusText"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Expected Airtable Columns</div>
+      <div class="card-desc">
+        Make sure your table has these exact column names. The field types should match too.
+      </div>
+
+      <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+        <thead>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <th style="text-align: left; padding: 6px 0; color: var(--text-muted); font-weight: 500;">Column Name</th>
+            <th style="text-align: left; padding: 6px 0; color: var(--text-muted); font-weight: 500;">Field Type</th>
+          </tr>
+        </thead>
+        <tbody style="color: var(--text-secondary);">
+          <tr><td style="padding: 6px 0;">Job Title</td><td style="padding: 6px 0;">Single line text</td></tr>
+          <tr><td style="padding: 6px 0;">Company</td><td style="padding: 6px 0;">Single line text</td></tr>
+          <tr><td style="padding: 6px 0;">Location</td><td style="padding: 6px 0;">Single line text</td></tr>
+          <tr><td style="padding: 6px 0;">Salary Range</td><td style="padding: 6px 0;">Single line text</td></tr>
+          <tr><td style="padding: 6px 0;">Job Description</td><td style="padding: 6px 0;">Long text</td></tr>
+          <tr><td style="padding: 6px 0;">URL</td><td style="padding: 6px 0;">URL</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="help-section">
+      <h3>Setup Guide</h3>
+      <ol class="help-steps">
+        <li>Go to <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener" style="color: var(--accent);">airtable.com/create/tokens</a> and create a new token</li>
+        <li>Give it <strong>data.records:write</strong> scope and access to your base</li>
+        <li>Copy the Base ID from your Airtable base URL (starts with "app")</li>
+        <li>Enter your table name exactly as it appears in the tab</li>
+        <li>Click "Test Connection" to verify everything works</li>
+      </ol>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

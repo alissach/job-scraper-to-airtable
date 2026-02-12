@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Scraper</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0a0a0b;
+      --surface: #141416;
+      --surface-hover: #1c1c1f;
+      --border: #27272a;
+      --border-focus: #3f3f46;
+      --text: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-muted: #71717a;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --success: #16a34a;
+      --success-bg: #052e16;
+      --error: #dc2626;
+      --error-bg: #450a0a;
+      --radius: 8px;
+    }
+
+    body {
+      width: 380px;
+      min-height: 200px;
+      max-height: 580px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-y: auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .header-icon svg {
+      width: 12px;
+      height: 12px;
+      fill: white;
+    }
+
+    .header h1 {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .settings-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+
+    .settings-btn:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+      border-color: var(--border-focus);
+    }
+
+    /* States */
+    .state {
+      display: none;
+      padding: 16px;
+    }
+
+    .state.active {
+      display: block;
+    }
+
+    /* Loading state */
+    .loading-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 16px;
+      gap: 12px;
+    }
+
+    .loading-state.active {
+      display: flex;
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 2.5px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-state p {
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    /* Form */
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-group:last-of-type {
+      margin-bottom: 0;
+    }
+
+    .form-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .form-label label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .form-label .char-count {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    input[type="text"],
+    textarea {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 8px 10px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]:focus,
+    textarea:focus {
+      border-color: var(--accent);
+    }
+
+    input[type="text"]::placeholder,
+    textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    textarea.description-field {
+      min-height: 80px;
+      max-height: 140px;
+      font-size: 12px;
+    }
+
+    .url-field {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Buttons */
+    .button-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn {
+      flex: 1;
+      padding: 9px 16px;
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    /* Status banner */
+    .status-banner {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      margin: 0 16px 12px;
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .status-banner.active {
+      display: flex;
+    }
+
+    .status-banner.success {
+      background: var(--success-bg);
+      color: #4ade80;
+      border: 1px solid #14532d;
+    }
+
+    .status-banner.error {
+      background: var(--error-bg);
+      color: #f87171;
+      border: 1px solid #7f1d1d;
+    }
+
+    .status-banner svg {
+      flex-shrink: 0;
+      width: 14px;
+      height: 14px;
+    }
+
+    .status-banner .status-text {
+      flex: 1;
+      line-height: 1.4;
+    }
+
+    /* No config state */
+    .no-config {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 24px;
+      gap: 12px;
+      text-align: center;
+    }
+
+    .no-config.active {
+      display: flex;
+    }
+
+    .no-config-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .no-config-icon svg {
+      width: 20px;
+      height: 20px;
+      color: var(--text-muted);
+    }
+
+    .no-config h2 {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .no-config p {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .no-config .btn {
+      margin-top: 4px;
+      flex: none;
+      padding: 8px 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 6H16V4C16 2.89 15.11 2 14 2H10C8.89 2 8 2.89 8 4V6H4C2.89 6 2 6.89 2 8V19C2 20.11 2.89 21 4 21H20C21.11 21 22 20.11 22 19V8C22 6.89 21.11 6 20 6ZM10 4H14V6H10V4Z"/></svg>
+      </div>
+      <h1>Job Scraper</h1>
+    </div>
+    <button class="settings-btn" id="openSettings">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      Settings
+    </button>
+  </div>
+
+  <!-- No config state -->
+  <div class="no-config" id="noConfigState">
+    <div class="no-config-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+    </div>
+    <h2>Setup Required</h2>
+    <p>Add your Airtable credentials in Settings to start saving job postings.</p>
+    <button class="btn btn-primary" id="openSettingsFromConfig">Open Settings</button>
+  </div>
+
+  <!-- Loading state -->
+  <div class="loading-state" id="loadingState">
+    <div class="spinner"></div>
+    <p>Scanning job posting...</p>
+  </div>
+
+  <!-- Form state -->
+  <div class="state" id="formState">
+    <!-- Status banner (success/error) -->
+    <div class="status-banner" id="statusBanner">
+      <svg id="statusIcon" viewBox="0 0 24 24" fill="currentColor"></svg>
+      <span class="status-text" id="statusText"></span>
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <label for="jobTitle">Job Title</label>
+      </div>
+      <input type="text" id="jobTitle" placeholder="e.g. Senior UX Designer" />
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <label for="company">Company</label>
+      </div>
+      <input type="text" id="company" placeholder="e.g. Omnidian" />
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <label for="location">Location</label>
+      </div>
+      <input type="text" id="location" placeholder="e.g. Seattle, Hybrid" />
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <label for="salary">Salary Range</label>
+      </div>
+      <input type="text" id="salary" placeholder="e.g. $110,500 - $149,500 a year" />
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <label for="description">Job Description</label>
+        <span class="char-count" id="descCharCount"></span>
+      </div>
+      <textarea id="description" class="description-field" placeholder="Full job description..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <label for="url">URL</label>
+      </div>
+      <input type="text" id="url" class="url-field" readonly />
+    </div>
+  </div>
+
+  <!-- Action buttons -->
+  <div class="button-row" id="buttonRow" style="display: none;">
+    <button class="btn btn-secondary" id="rescanBtn">Rescan</button>
+    <button class="btn btn-primary" id="saveBtn">
+      Save to Airtable
+    </button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

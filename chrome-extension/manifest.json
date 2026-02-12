@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Job Scraper to Airtable",
+  "version": "1.0.0",
+  "description": "One-click job posting scraper that saves to your Airtable base.",
+  "permissions": ["activeTab", "storage", "scripting"],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html"
+}
