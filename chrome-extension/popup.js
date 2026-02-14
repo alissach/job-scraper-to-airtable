@@ -317,6 +317,12 @@ async function scrapeCurrentTab() {
             /benefits\s+(?:&|and)\s+perks/i,
             /what\s+we\s+offer/i,
             /perks\s+(?:&|and)\s+benefits/i,
+            /diversity\s+(?:&|and)\s+inclusion/i,
+            /work\s+authorization/i,
+            /physical\s+(?:requirements|demands)/i,
+            /(?:our\s+)?commitment\s+to\s+(?:diversity|inclusion|equity)/i,
+            /\baccommodations?\b/i,
+            /\bdisclaimer\b/i,
           ];
 
           const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
@@ -351,13 +357,57 @@ async function scrapeCurrentTab() {
             /reasonable\s+accommodation/i,
             /\be-verify\b/i,
             /background\s+check\s+(?:will|may)\s+be\s+(?:conducted|required)/i,
+            /all\s+qualified\s+applicants\s+will\s+receive\s+consideration/i,
+            /without\s+regard\s+to\s+(?:race|age|sex|gender|national\s+origin|disability)/i,
+            /pursuant\s+to\s+(?:applicable|state|local|federal)/i,
+            /(?:will\s+not|does\s+not)\s+(?:provide|sponsor)\s+(?:work\s+authorization|visa|immigration)/i,
+            /visa\s+sponsorship\s+(?:is\s+not\s+)?(?:available|provided|offered)/i,
+            /above\s+statements?\s+(?:are\s+)?intended\s+to\s+describe/i,
+            /this\s+(?:job\s+)?description\s+is\s+not\s+designed/i,
+            /is\s+(?:an?\s+)?(?:equal[\s-]opportunity|eeo|affirmative\s+action)\s+employer/i,
+            /is\s+committed\s+to\s+(?:equal|diversity|inclusion|creating\s+a\s+diverse)/i,
+            /we\s+celebrate\s+diversity/i,
+            /employment\s+is\s+contingent\s+(?:upon|on)/i,
+            /\bdrug\s+(?:screen|test|free\s+workplace)\b/i,
+            /must\s+be\s+able\s+to\s+(?:lift|stand|sit|walk|bend|stoop)/i,
+            /your\s+(?:personal\s+)?information\s+will\s+be\s+kept\s+confidential/i,
+            /pay\s+(?:range|scale|transparency)[:\s]/i,
           ];
-          const allParagraphs = container.querySelectorAll('p, div > span');
+          const allParagraphs = container.querySelectorAll('p, li, div > span');
           for (let i = allParagraphs.length - 1; i >= 0; i--) {
             const p = allParagraphs[i];
             const text = p.textContent.trim();
             if (text.length === 0) continue;
             if (eeoPatterns.some(pattern => pattern.test(text))) p.remove();
+          }
+
+          // Phase 4: Remove trailing legal/boilerplate blocks from the bottom up
+          const trailingPatterns = [
+            /equal\s+opportunity/i,
+            /all\s+qualified\s+applicants/i,
+            /without\s+regard\s+to/i,
+            /pursuant\s+to/i,
+            /visa\s+sponsorship/i,
+            /work\s+authorization/i,
+            /background\s+check/i,
+            /reasonable\s+accommodation/i,
+            /is\s+committed\s+to\s+(?:diversity|equal|inclusion)/i,
+            /employment\s+is\s+contingent/i,
+            /drug\s+(?:screen|test)/i,
+            /above\s+statements?\s+(?:are\s+)?intended/i,
+            /this\s+(?:job\s+)?description\s+is\s+not\s+designed/i,
+            /pay\s+(?:range|scale)[:\s]/i,
+            /salary\s+range[:\s]+\$/i,
+          ];
+          const topChildren = Array.from(container.children);
+          for (let i = topChildren.length - 1; i >= 0; i--) {
+            const text = topChildren[i].textContent.trim();
+            if (!text) { topChildren[i].remove(); continue; }
+            if (trailingPatterns.some(p => p.test(text))) {
+              topChildren[i].remove();
+            } else {
+              break;
+            }
           }
 
           return container;
