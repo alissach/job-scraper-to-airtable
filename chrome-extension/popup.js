@@ -432,9 +432,9 @@ async function scrapeCurrentTab() {
           return "";
         }
 
-        // ── Fallback: Location extraction (improved) ──
+        // ── Fallback: Location extraction ──
         function extractLocation() {
-          // 1. Platform-specific location selectors
+          // 1. Platform-specific DOM selectors
           const locationSelectors = [
             '[data-qa="job-location"]',
             '[class*="job-location"]', '[class*="jobLocation"]', '[class*="job_location"]',
@@ -443,6 +443,8 @@ async function scrapeCurrentTab() {
             '.ashby-job-posting-brief-location',
             '[class*="workplaceType"]',
             '[itemprop="jobLocation"]',
+            '[data-automation="jobLocation"]',
+            '[data-testid*="location"]',
           ];
           for (const sel of locationSelectors) {
             const el = document.querySelector(sel);
@@ -452,68 +454,117 @@ async function scrapeCurrentTab() {
             }
           }
 
-          // 2. Search job header/meta area first
+          // US state abbreviations for validating City, ST matches
+          const US_STATES = new Set(['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC']);
+          const SKIP_ABBR = new Set(['Inc','LLC','Corp','Ltd','Co','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Mon','Tue','Wed','Thu','Fri','Sat','Sun','US','USA','CEO','CTO','CFO','VP','HR','IT','UI','UX','AI','ML','PM','QA','BA','No','St']);
+
+          function cleanLoc(text) {
+            return text.trim().replace(/\s*[|;].*$/, '').trim();
+          }
+
+          // 2. Meta description tag often contains location
+          const metaDesc = document.querySelector('meta[name="description"], meta[property="og:description"]');
+          if (metaDesc && metaDesc.content) {
+            const m = metaDesc.content.match(/\b([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*),\s*([A-Z]{2})\b/);
+            if (m && US_STATES.has(m[2]) && !SKIP_ABBR.has(m[1])) return m[1] + ', ' + m[2];
+            const r = metaDesc.content.match(/\b(Fully Remote|Remote(?:\s*[-–]\s*\w+)?|Hybrid|On[- ]?site)\b/i);
+            if (r) return r[1].trim();
+          }
+
+          // 3. Job header/meta area — labeled patterns
           const headerArea = document.querySelector(
             '.posting-headline, .job-header, .job-info, ' +
             '[class*="job-header"], [class*="jobHeader"], [class*="job-info"], ' +
             '[class*="posting-header"], [class*="job-meta"]'
           );
           if (headerArea) {
-            const headerText = headerArea.innerText || '';
-            const headerLocPatterns = [
-              /(?:Location|Office|Based in|Work Location)[:\s]*([^\n]{3,60})/i,
+            const ht = headerArea.innerText || '';
+            for (const re of [
+              /(?:Location|Office|Based in|Work Location|Workplace)[:\s]+([^\n]{3,80})/i,
               /(?:\u{1F4CD}|\u{1F30D}|\u{1F3E2})\s*([^\n]{3,60})/u,
-            ];
-            for (const pattern of headerLocPatterns) {
-              const match = headerText.match(pattern);
-              if (match) {
-                const loc = match[1].trim().replace(/[;].*$/, '').trim();
-                if (loc.length > 2 && loc.length < 80) return loc;
-              }
+            ]) {
+              const m = ht.match(re);
+              if (m) { const loc = cleanLoc(m[1]); if (loc.length > 2 && loc.length < 80) return loc; }
             }
           }
 
-          // 3. Labeled location patterns on body text
+          // 4. Labeled patterns anywhere in body text
           const bodyText = document.body.innerText || "";
-          const locationPatterns = [
-            /(?:Location|Office|Based in|Work Location)[:\s]*([^\n]{3,60})/i,
+          for (const re of [
+            /^Location[:\s]+(.+)$/im,
+            /(?:Location|Office|Based in|Work Location|Workplace Type|Job Location)[:\s]+([^\n]{3,80})/i,
             /(?:\u{1F4CD}|\u{1F30D}|\u{1F3E2})\s*([^\n]{3,60})/u,
-          ];
-          for (const pattern of locationPatterns) {
-            const match = bodyText.match(pattern);
-            if (match) {
-              const loc = match[1].trim().replace(/[;].*$/, "").trim();
-              if (loc.length > 2 && loc.length < 80) return loc;
-            }
+          ]) {
+            const m = bodyText.match(re);
+            if (m) { const loc = cleanLoc(m[1]); if (loc.length > 2 && loc.length < 80) return loc; }
           }
 
-          // 4. City, State pattern (restricted to top of page to avoid false matches)
-          const topText = bodyText.substring(0, 2000);
-          const cityStatePattern = /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)*,\s*(?:[A-Z]{2}|[A-Z][a-z]+(?:\s[A-Z][a-z]+)*))\b/;
-          const cityMatch = topText.match(cityStatePattern);
-          if (cityMatch) {
-            const candidate = cityMatch[1].trim();
-            const surrounding = topText.substring(Math.max(0, cityMatch.index - 20), cityMatch.index + candidate.length + 30);
-            const workType = surrounding.match(/\b(Remote|Hybrid|On[- ]?site|In[- ]?office)\b/i);
-            if (workType) return candidate + ', ' + workType[1];
-            return candidate;
+          // 5. City, ST (validated against US state abbreviations) — scan top 8000 chars
+          const topText = bodyText.substring(0, 8000);
+          const cityStateRe = /\b([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*),\s*([A-Z]{2})\b/g;
+          let cm;
+          while ((cm = cityStateRe.exec(topText)) !== null) {
+            if (!US_STATES.has(cm[2]) || SKIP_ABBR.has(cm[1])) continue;
+            const result = cm[1] + ', ' + cm[2];
+            const ctx = topText.substring(Math.max(0, cm.index - 30), cm.index + result.length + 50);
+            const wt = ctx.match(/\b(Remote|Hybrid|On[- ]?site|In[- ]?office)\b/i);
+            return wt ? result + ' (' + wt[1] + ')' : result;
           }
 
-          // 5. Standalone Remote/Hybrid (top of page only)
-          const remoteMatch = topText.match(/\b(Fully Remote|Remote|Hybrid|On[- ]?site|In[- ]?office)\b/i);
-          if (remoteMatch) return remoteMatch[1];
+          // 6. City, full state name
+          const fullStateRe = /\b([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*),\s*(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming|District of Columbia)\b/i;
+          const fsm = topText.match(fullStateRe);
+          if (fsm) return fsm[1].trim() + ', ' + fsm[2].trim();
+
+          // 7. Standalone Remote / Hybrid with optional qualifier
+          const rm = topText.match(/\b(Fully Remote|Remote(?:\s*[-–(]\s*[\w\s]+\)?)?|Hybrid(?:\s*[-–(]\s*[\w\s]+\)?)?|On[- ]?site|In[- ]?office)\b/i);
+          if (rm) return rm[1].trim();
+
           return "";
         }
 
-        // ── Fallback: Salary extraction (unchanged) ──
+        // ── Fallback: Salary extraction ──
         function extractSalary() {
           const bodyText = document.body.innerText || "";
-          const fullRange = bodyText.match(/\$[\d,]+(?:\.\d{2})?\s*[-\u2013\u2014to]+\s*\$[\d,]+(?:\.\d{2})?(?:\s*(?:per\s+(?:year|annum|month|hour)|\/\s*(?:yr|year|mo|month|hr|hour)|a\s+year|annually|USD))?/i);
+
+          // 1. Search labeled salary section in header area first (more reliable)
+          const headerArea = document.querySelector(
+            '.posting-headline, .job-header, .job-info, ' +
+            '[class*="job-header"], [class*="jobHeader"], [class*="salary"], [class*="compensation"], ' +
+            '[class*="pay-range"], [class*="payRange"], [data-testid*="salary"]'
+          );
+          if (headerArea) {
+            const ht = headerArea.innerText || '';
+            const m = ht.match(/\$[\d,]+(?:\.\d{2})?[Kk]?\s*[-\u2013\u2014to]+\s*\$[\d,]+(?:\.\d{2})?[Kk]?(?:\s*(?:per\s+(?:year|annum|month|hour)|\/\s*(?:yr|year|mo|month|hr|hour)|annually))?/i);
+            if (m) return m[0].trim();
+          }
+
+          // 2. $ range: "$120,000 - $160,000 /yr" or "$120K - $160K"
+          const fullRange = bodyText.match(/\$[\d,]+(?:\.\d{2})?[Kk]?\s*[-\u2013\u2014to]+\s*\$[\d,]+(?:\.\d{2})?[Kk]?(?:\s*(?:per\s+(?:year|annum|month|hour)|\/\s*(?:yr|year|mo|month|hr|hour)|a\s+year|annually|USD))?/i);
           if (fullRange) return fullRange[0].trim();
-          const kRange = bodyText.match(/\$\d+[Kk]\s*[-\u2013\u2014to]+\s*\$\d+[Kk](?:\s*(?:per\s+year|\/yr|annually))?/i);
-          if (kRange) return kRange[0].trim();
-          const single = bodyText.match(/(?:salary|compensation|pay|base)[:\s]*\$[\d,]+(?:\.\d{2})?(?:\s*[-\u2013\u2014]\s*\$[\d,]+(?:\.\d{2})?)?/i);
+
+          // 3. Labeled salary with number range (no $ required): "Salary: 120,000 - 160,000"
+          const labeledRange = bodyText.match(/(?:salary|compensation|pay|base pay|total pay|pay range|salary range)[:\s]+\$?([\d,]+[Kk]?)\s*[-\u2013\u2014to]+\s*\$?([\d,]+[Kk]?)(?:\s*(?:per\s+(?:year|annum|month|hour)|\/\s*(?:yr|year|mo|month|hr|hour)|annually|USD))?/i);
+          if (labeledRange) {
+            const raw = labeledRange[0].replace(/^(?:salary|compensation|pay|base pay|total pay|pay range|salary range)[:\s]*/i, '').trim();
+            return raw;
+          }
+
+          // 4. Hourly rate: "$45/hr" or "$45 - $55 per hour"
+          const hourly = bodyText.match(/\$[\d,]+(?:\.\d{2})?\s*[-\u2013\u2014to]*\s*\$?[\d,]*(?:\.\d{2})?\s*(?:per\s+hour|\/\s*hr|\/\s*hour|an\s+hour)/i);
+          if (hourly) return hourly[0].trim();
+
+          // 5. Plain number range near salary keyword: "150,000 – 200,000 annually"
+          const plainRange = bodyText.match(/(?:salary|compensation|pay)[^\n]{0,30}?([\d,]{5,})\s*[-\u2013\u2014to]+\s*([\d,]{5,})(?:\s*(?:per\s+(?:year|annum)|annually|USD|a\s+year))?/i);
+          if (plainRange) {
+            const unit = plainRange[0].match(/(?:per\s+(?:year|annum)|annually|USD|a\s+year)/i);
+            return '$' + plainRange[1] + ' - $' + plainRange[2] + (unit ? ' ' + unit[0] : '');
+          }
+
+          // 6. Single labeled value: "Salary: $120,000"
+          const single = bodyText.match(/(?:salary|compensation|pay|base)[:\s]*\$[\d,]+(?:\.\d{2})?(?:[Kk])?(?:\s*[-\u2013\u2014]\s*\$[\d,]+(?:\.\d{2})?[Kk]?)?/i);
           if (single) return single[0].replace(/^(?:salary|compensation|pay|base)[:\s]*/i, "").trim();
+
           return "";
         }
 
