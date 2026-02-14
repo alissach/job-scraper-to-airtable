@@ -29,28 +29,8 @@ async function saveToAirtable(jobData) {
 
   const url = `https://api.airtable.com/v0/${airtableBaseId}/${encodeURIComponent(airtableTableName)}`;
 
-  // Prepare description field - convert rich text to Airtable format if needed
-  let descriptionField = jobData.description || "";
-  if (Array.isArray(jobData.description)) {
-    // It's in our rich text format, convert to Airtable's format
-    descriptionField = {
-      "richText": jobData.description
-    };
-  } else if (typeof jobData.description === "string") {
-    // Check if it looks like JSON (rich text might come as JSON string)
-    if (jobData.description.startsWith("[") && jobData.description.includes("text")) {
-      try {
-        const parsed = JSON.parse(jobData.description);
-        if (Array.isArray(parsed) && parsed.every(item => item && typeof item === "object" && "text" in item)) {
-          descriptionField = {
-            "richText": parsed
-          };
-        }
-      } catch {
-        // Keep as plain string
-      }
-    }
-  }
+  // Description is now a Markdown string (Airtable rich text fields use Markdown)
+  const description = jobData.description || "";
 
   const response = await fetch(url, {
     method: "POST",
@@ -66,7 +46,7 @@ async function saveToAirtable(jobData) {
             "Company": jobData.company || "",
             "Location": jobData.location || "",
             "Salary Range": jobData.salary || "",
-            "Job Description": descriptionField,
+            "Job Description": description,
             "URL": jobData.url || "",
           },
         },

@@ -70,19 +70,339 @@ async function scrapeCurrentTab() {
     const results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: () => {
-        function extractJobTitle() {
-          const h1 = document.querySelector("h1");
-          if (h1 && h1.textContent.trim().length > 2) return h1.textContent.trim();
-          const ogTitle = document.querySelector('meta[property="og:title"]');
-          if (ogTitle && ogTitle.content) return ogTitle.content.trim();
-          const title = document.title || "";
-          return title.split(/\s*[|\-\u2013\u2014]\s*/)[0].trim();
-        }
-
+        // ── Utility: format URL slug to title case ──
         function formatCompanyName(slug) {
           return slug.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
         }
 
+        // ── HTML to Markdown conversion (Airtable rich text uses Markdown) ──
+        function elementToMarkdown(element) {
+          let result = '';
+
+          function getInlineText(node) {
+            if (node.nodeType === 3) return node.textContent;
+            if (node.nodeType !== 1) return '';
+            const tag = node.tagName.toLowerCase();
+            if (['script', 'style', 'noscript', 'iframe'].includes(tag)) return '';
+            let inner = '';
+            for (const child of node.childNodes) inner += getInlineText(child);
+            if (!inner.trim()) return inner;
+            if (['strong', 'b'].includes(tag)) return `**${inner.trim()}** `;
+            if (['em', 'i'].includes(tag)) return `*${inner.trim()}* `;
+            if (['del', 's'].includes(tag)) return `~~${inner.trim()}~~ `;
+            if (tag === 'code') return `\`${inner.trim()}\` `;
+            if (tag === 'a' && node.href) return `[${inner.trim()}](${node.href})`;
+            if (tag === 'br') return '\n';
+            return inner;
+          }
+
+          function processNode(node) {
+            if (node.nodeType === 3) {
+              const text = node.textContent;
+              if (text && text.trim().length > 0) {
+                result += text;
+              }
+              return;
+            }
+            if (node.nodeType !== 1) return;
+            const tag = node.tagName.toLowerCase();
+            if (['script', 'style', 'noscript', 'iframe', 'nav', 'header', 'footer'].includes(tag)) return;
+
+            if (tag === 'br') {
+              result += '\n';
+              return;
+            }
+            if (tag.match(/^h([1-3])$/)) {
+              const level = parseInt(tag[1]);
+              const prefix = '#'.repeat(level) + ' ';
+              const text = getInlineText(node).trim();
+              if (text) {
+                result += '\n' + prefix + text + '\n';
+              }
+              return;
+            }
+            if (tag.match(/^h[4-6]$/)) {
+              const text = getInlineText(node).trim();
+              if (text) {
+                result += '\n**' + text + '**\n';
+              }
+              return;
+            }
+            if (tag === 'ul') {
+              result += '\n';
+              for (const child of node.children) {
+                if (child.tagName && child.tagName.toLowerCase() === 'li') {
+                  const text = getInlineText(child).trim();
+                  if (text) result += '- ' + text + '\n';
+                }
+              }
+              return;
+            }
+            if (tag === 'ol') {
+              result += '\n';
+              let num = 1;
+              for (const child of node.children) {
+                if (child.tagName && child.tagName.toLowerCase() === 'li') {
+                  const text = getInlineText(child).trim();
+                  if (text) result += num++ + '. ' + text + '\n';
+                }
+              }
+              return;
+            }
+            if (['strong', 'b'].includes(tag)) {
+              const inner = getInlineText(node).trim();
+              if (inner) result += '**' + inner + '**';
+              return;
+            }
+            if (['em', 'i'].includes(tag)) {
+              const inner = getInlineText(node).trim();
+              if (inner) result += '*' + inner + '*';
+              return;
+            }
+            if (['del', 's'].includes(tag)) {
+              const inner = getInlineText(node).trim();
+              if (inner) result += '~~' + inner + '~~';
+              return;
+            }
+            if (tag === 'blockquote') {
+              const inner = getInlineText(node).trim();
+              if (inner) {
+                result += '\n' + inner.split('\n').map(l => '> ' + l).join('\n') + '\n';
+              }
+              return;
+            }
+            if (tag === 'p' || tag === 'div') {
+              for (const child of node.childNodes) processNode(child);
+              if (!result.endsWith('\n')) result += '\n';
+              return;
+            }
+            if (tag === 'li') {
+              for (const child of node.childNodes) processNode(child);
+              if (!result.endsWith('\n')) result += '\n';
+              return;
+            }
+            for (const child of node.childNodes) processNode(child);
+          }
+
+          processNode(element);
+          return result;
+        }
+
+        // ── JSON-LD structured data extraction (highest priority) ──
+        function parseJsonLdLocation(jobLocation) {
+          const locations = Array.isArray(jobLocation) ? jobLocation : [jobLocation];
+          const parts = [];
+          for (const loc of locations) {
+            if (typeof loc === 'string') { parts.push(loc.trim()); continue; }
+            const address = loc.address;
+            if (!address) continue;
+            if (typeof address === 'string') { parts.push(address.trim()); continue; }
+            const addrParts = [];
+            if (address.addressLocality) addrParts.push(address.addressLocality);
+            if (address.addressRegion) addrParts.push(address.addressRegion);
+            if (address.addressCountry) {
+              const country = typeof address.addressCountry === 'string'
+                ? address.addressCountry
+                : address.addressCountry.name || '';
+              if (country && !['US', 'USA', 'United States'].includes(country)) {
+                addrParts.push(country);
+              }
+            }
+            if (addrParts.length > 0) parts.push(addrParts.join(', '));
+          }
+          return parts.length > 0 ? parts.join(' / ') : null;
+        }
+
+        function parseJsonLdSalary(baseSalary) {
+          if (typeof baseSalary === 'string') return baseSalary.trim() || null;
+          const value = baseSalary.value;
+          const currency = baseSalary.currency || 'USD';
+          const symbol = currency === 'USD' ? '$' : currency + ' ';
+          if (!value && baseSalary.minValue == null) return null;
+          let unitText = '';
+          const unit = (baseSalary.unitText || '').toUpperCase();
+          if (unit === 'YEAR' || unit === 'ANNUAL') unitText = '/yr';
+          else if (unit === 'MONTH') unitText = '/mo';
+          else if (unit === 'HOUR') unitText = '/hr';
+          if (typeof value === 'number') {
+            return symbol + value.toLocaleString('en-US') + unitText;
+          }
+          if (typeof value === 'object' && value !== null) {
+            const min = value.minValue;
+            const max = value.maxValue;
+            if (min != null && max != null) return symbol + Number(min).toLocaleString('en-US') + ' - ' + symbol + Number(max).toLocaleString('en-US') + unitText;
+            if (min != null) return symbol + Number(min).toLocaleString('en-US') + '+' + unitText;
+            if (max != null) return 'Up to ' + symbol + Number(max).toLocaleString('en-US') + unitText;
+          }
+          // Some schemas put minValue/maxValue directly on baseSalary
+          if (baseSalary.minValue != null && baseSalary.maxValue != null) {
+            return symbol + Number(baseSalary.minValue).toLocaleString('en-US') + ' - ' + symbol + Number(baseSalary.maxValue).toLocaleString('en-US') + unitText;
+          }
+          return null;
+        }
+
+        function extractFromJsonLd() {
+          const result = { jobTitle: null, company: null, location: null, salary: null, descriptionHtml: null };
+          const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+          for (const script of scripts) {
+            try {
+              let data = JSON.parse(script.textContent);
+              if (data['@graph'] && Array.isArray(data['@graph'])) data = data['@graph'];
+              const items = Array.isArray(data) ? data : [data];
+              for (const item of items) {
+                const itemType = item['@type'];
+                const isJobPosting = itemType === 'JobPosting' || (Array.isArray(itemType) && itemType.includes('JobPosting'));
+                if (!isJobPosting) continue;
+                if (item.title) result.jobTitle = item.title.trim();
+                if (item.hiringOrganization) {
+                  const org = item.hiringOrganization;
+                  if (typeof org === 'string') result.company = org.trim();
+                  else if (org.name) result.company = org.name.trim();
+                }
+                if (item.jobLocation) result.location = parseJsonLdLocation(item.jobLocation);
+                if (item.jobLocationType) {
+                  const remoteLabel = item.jobLocationType === 'TELECOMMUTE' ? 'Remote' : item.jobLocationType;
+                  result.location = result.location ? result.location + ', ' + remoteLabel : remoteLabel;
+                }
+                if (!result.location && item.applicantLocationRequirements) {
+                  const reqs = Array.isArray(item.applicantLocationRequirements) ? item.applicantLocationRequirements : [item.applicantLocationRequirements];
+                  const names = reqs.map(r => r.name || '').filter(Boolean);
+                  if (names.length > 0) result.location = names.join(', ');
+                }
+                if (item.baseSalary) result.salary = parseJsonLdSalary(item.baseSalary);
+                if (!result.salary && item.estimatedSalary) {
+                  const est = Array.isArray(item.estimatedSalary) ? item.estimatedSalary[0] : item.estimatedSalary;
+                  if (est) result.salary = parseJsonLdSalary(est);
+                }
+                if (item.description) result.descriptionHtml = item.description;
+                return result;
+              }
+            } catch (e) { continue; }
+          }
+          return result;
+        }
+
+        // ── Boilerplate stripping for descriptions ──
+        function stripBoilerplateFromHtml(container) {
+          // Phase 1: Remove elements by selector
+          const removeSelectors = [
+            'nav', 'header', 'footer',
+            '.nav', '.header', '.footer', '.sidebar',
+            '.cookie-banner', '.social-share',
+            '[class*="apply-button"]', '[class*="apply-now"]',
+            '[class*="similar-jobs"]', '[class*="related-jobs"]', '[class*="related-positions"]',
+            '[class*="cookie"]', '[class*="privacy"]',
+            'script', 'style', 'noscript', 'iframe',
+          ];
+          for (const sel of removeSelectors) {
+            container.querySelectorAll(sel).forEach(el => el.remove());
+          }
+
+          // Phase 2: Remove sections by heading text content
+          const boilerplateHeadings = [
+            /equal\s+(?:opportunity|employment)/i,
+            /\beeo\b/i,
+            /(?:we\s+(?:do\s+not|don.t)\s+discriminate)/i,
+            /non[- ]?discrimination/i,
+            /affirmative\s+action/i,
+            /privacy\s+(?:policy|notice|statement)/i,
+            /cookie\s+(?:policy|notice)/i,
+            /similar\s+(?:jobs|roles)/i,
+            /related\s+(?:jobs|positions|roles)/i,
+            /how\s+to\s+apply/i,
+            /application\s+(?:instructions|process|deadline)/i,
+            /about\s+(?:us|the\s+company)/i,
+            /who\s+we\s+are/i,
+            /our\s+(?:company|mission|values|culture|story)/i,
+            /benefits\s+(?:&|and)\s+perks/i,
+            /what\s+we\s+offer/i,
+            /perks\s+(?:&|and)\s+benefits/i,
+          ];
+
+          const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
+          for (const heading of headings) {
+            const text = heading.textContent.trim();
+            const isBoilerplate = boilerplateHeadings.some(p => p.test(text));
+            if (!isBoilerplate) continue;
+            // If inside a dedicated section/div, remove the container
+            const section = heading.closest('section, [class*="section"], [class*="block"]');
+            if (section && section !== container) { section.remove(); continue; }
+            // Otherwise remove heading + following siblings until next same-or-higher heading
+            const headingLevel = heading.tagName.match(/^H(\d)$/i);
+            const level = headingLevel ? parseInt(headingLevel[1]) : 99;
+            let sibling = heading.nextElementSibling;
+            const toRemove = [heading];
+            while (sibling) {
+              const sibTag = sibling.tagName.match(/^H(\d)$/i);
+              if (sibTag && parseInt(sibTag[1]) <= level) break;
+              toRemove.push(sibling);
+              sibling = sibling.nextElementSibling;
+            }
+            toRemove.forEach(el => el.remove());
+          }
+
+          // Phase 3: Remove standalone EEO/legal paragraphs by text content
+          const eeoPatterns = [
+            /equal\s+opportunity\s+employer/i,
+            /we\s+(?:are\s+an?\s+)?(?:equal\s+opportunity|affirmative\s+action)/i,
+            /(?:we\s+)?(?:do\s+not|don.t)\s+discriminate/i,
+            /race,?\s+color,?\s+religion/i,
+            /protected\s+(?:class|characteristic|status|veteran)/i,
+            /reasonable\s+accommodation/i,
+            /\be-verify\b/i,
+            /background\s+check\s+(?:will|may)\s+be\s+(?:conducted|required)/i,
+          ];
+          const allParagraphs = container.querySelectorAll('p, div > span');
+          for (let i = allParagraphs.length - 1; i >= 0; i--) {
+            const p = allParagraphs[i];
+            const text = p.textContent.trim();
+            if (text.length === 0) continue;
+            if (eeoPatterns.some(pattern => pattern.test(text))) p.remove();
+          }
+
+          return container;
+        }
+
+        // ── Fallback: Job title extraction ──
+        function extractJobTitle(companyName) {
+          // 1. og:title (often more accurate than h1 on job boards)
+          const ogTitle = document.querySelector('meta[property="og:title"]');
+          if (ogTitle && ogTitle.content) {
+            let title = ogTitle.content.trim().replace(/\s+at\s+.+$/i, '').trim();
+            if (title.length > 2) return title;
+          }
+
+          // 2. Elements with job-title-related classes/attributes
+          const titleSelectors = [
+            '[data-qa="job-title"]',
+            '[class*="job-title"]', '[class*="jobTitle"]', '[class*="job_title"]',
+            '[class*="posting-headline"] h2',
+            '.app-title',
+            '.posting-headline h2',
+            '.ashby-job-posting-brief-title',
+          ];
+          for (const sel of titleSelectors) {
+            const el = document.querySelector(sel);
+            if (el && el.textContent.trim().length > 2) return el.textContent.trim();
+          }
+
+          // 3. h1 elements, filtered for common non-title headings
+          const skipPatterns = /^(careers?|open\s+positions?|jobs?|join\s+us|join\s+our\s+team|work\s+with\s+us|we.re\s+hiring|opportunities)/i;
+          const h1s = document.querySelectorAll('h1');
+          for (const h1 of h1s) {
+            const text = h1.textContent.trim();
+            if (text.length <= 2) continue;
+            if (skipPatterns.test(text)) continue;
+            if (companyName && text.toLowerCase() === companyName.toLowerCase()) continue;
+            return text;
+          }
+
+          // 4. document.title fallback
+          const title = document.title || '';
+          return title.split(/\s*[|\-\u2013\u2014]\s*/)[0].replace(/\s+at\s+.+$/i, '').trim();
+        }
+
+        // ── Fallback: Company extraction (unchanged) ──
         function extractCompany() {
           const hostname = window.location.hostname;
           if (hostname.includes("greenhouse.io")) {
@@ -112,7 +432,48 @@ async function scrapeCurrentTab() {
           return "";
         }
 
+        // ── Fallback: Location extraction (improved) ──
         function extractLocation() {
+          // 1. Platform-specific location selectors
+          const locationSelectors = [
+            '[data-qa="job-location"]',
+            '[class*="job-location"]', '[class*="jobLocation"]', '[class*="job_location"]',
+            '[class*="location-display"]',
+            '.posting-categories .sort-by-commit',
+            '.ashby-job-posting-brief-location',
+            '[class*="workplaceType"]',
+            '[itemprop="jobLocation"]',
+          ];
+          for (const sel of locationSelectors) {
+            const el = document.querySelector(sel);
+            if (el) {
+              const text = el.textContent.trim();
+              if (text.length > 1 && text.length < 100) return text;
+            }
+          }
+
+          // 2. Search job header/meta area first
+          const headerArea = document.querySelector(
+            '.posting-headline, .job-header, .job-info, ' +
+            '[class*="job-header"], [class*="jobHeader"], [class*="job-info"], ' +
+            '[class*="posting-header"], [class*="job-meta"]'
+          );
+          if (headerArea) {
+            const headerText = headerArea.innerText || '';
+            const headerLocPatterns = [
+              /(?:Location|Office|Based in|Work Location)[:\s]*([^\n]{3,60})/i,
+              /(?:\u{1F4CD}|\u{1F30D}|\u{1F3E2})\s*([^\n]{3,60})/u,
+            ];
+            for (const pattern of headerLocPatterns) {
+              const match = headerText.match(pattern);
+              if (match) {
+                const loc = match[1].trim().replace(/[;].*$/, '').trim();
+                if (loc.length > 2 && loc.length < 80) return loc;
+              }
+            }
+          }
+
+          // 3. Labeled location patterns on body text
           const bodyText = document.body.innerText || "";
           const locationPatterns = [
             /(?:Location|Office|Based in|Work Location)[:\s]*([^\n]{3,60})/i,
@@ -125,20 +486,26 @@ async function scrapeCurrentTab() {
               if (loc.length > 2 && loc.length < 80) return loc;
             }
           }
+
+          // 4. City, State pattern (restricted to top of page to avoid false matches)
+          const topText = bodyText.substring(0, 2000);
           const cityStatePattern = /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)*,\s*(?:[A-Z]{2}|[A-Z][a-z]+(?:\s[A-Z][a-z]+)*))\b/;
-          const cityMatch = bodyText.match(cityStatePattern);
+          const cityMatch = topText.match(cityStatePattern);
           if (cityMatch) {
             const candidate = cityMatch[1].trim();
-            const surrounding = bodyText.substring(Math.max(0, cityMatch.index - 20), cityMatch.index + candidate.length + 30);
+            const surrounding = topText.substring(Math.max(0, cityMatch.index - 20), cityMatch.index + candidate.length + 30);
             const workType = surrounding.match(/\b(Remote|Hybrid|On[- ]?site|In[- ]?office)\b/i);
-            if (workType) return `${candidate}, ${workType[1]}`;
+            if (workType) return candidate + ', ' + workType[1];
             return candidate;
           }
-          const remoteMatch = bodyText.match(/\b(Fully Remote|Remote|Hybrid|On[- ]?site|In[- ]?office)\b/i);
+
+          // 5. Standalone Remote/Hybrid (top of page only)
+          const remoteMatch = topText.match(/\b(Fully Remote|Remote|Hybrid|On[- ]?site|In[- ]?office)\b/i);
           if (remoteMatch) return remoteMatch[1];
           return "";
         }
 
+        // ── Fallback: Salary extraction (unchanged) ──
         function extractSalary() {
           const bodyText = document.body.innerText || "";
           const fullRange = bodyText.match(/\$[\d,]+(?:\.\d{2})?\s*[-\u2013\u2014to]+\s*\$[\d,]+(?:\.\d{2})?(?:\s*(?:per\s+(?:year|annum|month|hour)|\/\s*(?:yr|year|mo|month|hr|hour)|a\s+year|annually|USD))?/i);
@@ -150,142 +517,53 @@ async function scrapeCurrentTab() {
           return "";
         }
 
-        function elementToAirtableRichText(element) {
-          const richText = [];
-          function processNode(node) {
-            if (node.nodeType === 3) {
-              const text = node.textContent;
-              if (text && text.trim().length > 0) {
-                richText.push({ text: text });
-              }
-              return;
+        // ── Description extraction (improved with boilerplate stripping) ──
+        function extractDescription(jsonLdHtml) {
+          let clone;
+          if (jsonLdHtml) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = jsonLdHtml;
+            clone = tempDiv;
+          } else {
+            const contentSelectors = [
+              '[class*="job-description"]', '[class*="jobDescription"]', '[class*="job_description"]',
+              '[id*="job-description"]', '[id*="jobDescription"]',
+              '.posting-page', '.content-wrapper .posting', '[data-qa="job-description"]',
+              '.job-details', '.job-content', '.description',
+              'article', 'main', '[role="main"]',
+            ];
+            let contentEl = null;
+            for (const sel of contentSelectors) {
+              contentEl = document.querySelector(sel);
+              if (contentEl) break;
             }
-            if (node.nodeType === 1) {
-              const tag = node.tagName.toLowerCase();
-              if (['script', 'style', 'noscript', 'iframe', 'nav', 'header', 'footer'].includes(tag)) return;
-              if (tag === 'br') {
-                if (richText.length > 0) {
-                  richText[richText.length - 1].text += '\n';
-                } else {
-                  richText.push({ text: '\n' });
-                }
-                return;
-              }
-              if (['p', 'div', 'li'].includes(tag)) {
-                for (let child of node.childNodes) processNode(child);
-                if (richText.length > 0 && !richText[richText.length - 1].text.endsWith('\n')) {
-                  richText[richText.length - 1].text += '\n';
-                }
-                return;
-              }
-              if (['ul', 'ol'].includes(tag)) {
-                for (let i = 0; i < node.childNodes.length; i++) {
-                  const child = node.childNodes[i];
-                  if (child.nodeType === 1 && child.tagName.toLowerCase() === 'li') {
-                    richText.push({ text: (tag === 'ul' ? '• ' : (i + 1) + '. ') });
-                    processNode(child);
-                  }
-                }
-                return;
-              }
-              if (['strong', 'b'].includes(tag)) {
-                const startIdx = richText.length;
-                for (let child of node.childNodes) processNode(child);
-                for (let i = startIdx; i < richText.length; i++) richText[i].bold = true;
-                return;
-              }
-              if (['em', 'i'].includes(tag)) {
-                const startIdx = richText.length;
-                for (let child of node.childNodes) processNode(child);
-                for (let i = startIdx; i < richText.length; i++) richText[i].italic = true;
-                return;
-              }
-              if (tag === 'u') {
-                const startIdx = richText.length;
-                for (let child of node.childNodes) processNode(child);
-                for (let i = startIdx; i < richText.length; i++) richText[i].underline = true;
-                return;
-              }
-              if (['del', 's'].includes(tag)) {
-                const startIdx = richText.length;
-                for (let child of node.childNodes) processNode(child);
-                for (let i = startIdx; i < richText.length; i++) richText[i].strikethrough = true;
-                return;
-              }
-              if (tag.match(/^h[1-6]$/)) {
-                richText.push({ text: '\n' });
-                const startIdx = richText.length;
-                for (let child of node.childNodes) processNode(child);
-                for (let i = startIdx; i < richText.length; i++) richText[i].bold = true;
-                if (richText.length > 0 && !richText[richText.length - 1].text.endsWith('\n')) {
-                  richText[richText.length - 1].text += '\n';
-                }
-                return;
-              }
-              for (let child of node.childNodes) processNode(child);
-            }
+            if (!contentEl) contentEl = document.body;
+            clone = contentEl.cloneNode(true);
           }
-          processNode(element);
-          const merged = [];
-          for (let item of richText) {
-            if (merged.length > 0) {
-              const last = merged[merged.length - 1];
-              if (last.bold === item.bold && last.italic === item.italic && last.underline === item.underline && last.strikethrough === item.strikethrough) {
-                last.text += item.text;
-                continue;
-              }
-            }
-            merged.push(item);
+
+          stripBoilerplateFromHtml(clone);
+
+          let markdown = elementToMarkdown(clone);
+          // Clean up whitespace
+          markdown = markdown.replace(/\t/g, " ").replace(/ {2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+          if (markdown.length > 50000) {
+            return markdown.substring(0, 50000) + "\n\n[Truncated]";
           }
-          return merged.map(item => {
-            const cleaned = { text: item.text };
-            if (item.bold) cleaned.bold = true;
-            if (item.italic) cleaned.italic = true;
-            if (item.underline) cleaned.underline = true;
-            if (item.strikethrough) cleaned.strikethrough = true;
-            return cleaned;
-          });
+          return markdown;
         }
 
-        function airtableRichTextToPlainText(richText) {
-          if (!Array.isArray(richText)) return '';
-          return richText.map(item => item.text).join('');
+        // ── Orchestrator: JSON-LD first, then fallbacks ──
+        function extractAll() {
+          const jsonLd = extractFromJsonLd();
+          const company = jsonLd.company || extractCompany();
+          const jobTitle = jsonLd.jobTitle || extractJobTitle(company);
+          const location = jsonLd.location || extractLocation();
+          const salary = jsonLd.salary || extractSalary();
+          const description = extractDescription(jsonLd.descriptionHtml);
+          return { jobTitle, company, location, salary, description, url: window.location.href };
         }
 
-        function extractDescription() {
-          const contentSelectors = ['[class*="job-description"]', '[class*="jobDescription"]', '[class*="job_description"]', '[id*="job-description"]', '[id*="jobDescription"]', '.posting-page', '.content-wrapper .posting', '[data-qa="job-description"]', '.job-details', '.job-content', '.description', 'article', 'main', '[role="main"]'];
-          let contentEl = null;
-          for (const sel of contentSelectors) {
-            contentEl = document.querySelector(sel);
-            if (contentEl) break;
-          }
-          if (!contentEl) contentEl = document.body;
-          const clone = contentEl.cloneNode(true);
-          const removeSelectors = ['nav', 'header', 'footer', '.nav', '.header', '.footer', '.sidebar', '.cookie-banner', '.social-share', '[class*="apply-button"]', '[class*="similar-jobs"]', 'script', 'style', 'noscript', 'iframe'];
-          for (const sel of removeSelectors) {
-            clone.querySelectorAll(sel).forEach((el) => el.remove());
-          }
-          const richText = elementToAirtableRichText(clone);
-          let plainText = airtableRichTextToPlainText(richText);
-          plainText = plainText.replace(/\t/g, " ").replace(/ {2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
-          if (plainText.length > 50000) {
-            plainText = plainText.substring(0, 50000) + "\n\n[Truncated]";
-            return plainText;
-          }
-          if (richText.some(item => item.bold || item.italic || item.underline || item.strikethrough)) {
-            return richText;
-          }
-          return plainText;
-        }
-
-        return {
-          jobTitle: extractJobTitle(),
-          company: extractCompany(),
-          location: extractLocation(),
-          salary: extractSalary(),
-          description: extractDescription(),
-          url: window.location.href,
-        };
+        return extractAll();
       },
     });
 
@@ -309,17 +587,8 @@ function populateForm(data) {
   elements.location.value = data.location || "";
   elements.salary.value = data.salary || "";
   
-  // Handle description which might be plain text or rich text
-  if (Array.isArray(data.description)) {
-    // It's rich text format - convert to plain text for display
-    elements.description.value = data.description.map(item => item.text).join('');
-    // Store the rich text in a data attribute for later use
-    elements.description.dataset.richText = JSON.stringify(data.description);
-  } else {
-    // It's plain text
-    elements.description.value = data.description || "";
-    delete elements.description.dataset.richText;
-  }
+  // Description is a Markdown string
+  elements.description.value = data.description || "";
   
   elements.url.value = data.url || "";
   updateCharCount();
@@ -363,15 +632,7 @@ async function saveToAirtable() {
   elements.saveBtn.disabled = true;
   hideStatus();
 
-  // Prepare description - use rich text if available
-  let description = elements.description.value.trim();
-  if (elements.description.dataset.richText) {
-    try {
-      description = JSON.parse(elements.description.dataset.richText);
-    } catch {
-      // Fall back to plain text if parsing fails
-    }
-  }
+  const description = elements.description.value.trim();
 
   const data = {
     jobTitle: elements.jobTitle.value.trim(),
