@@ -304,10 +304,69 @@ async function scrapeCurrentTab() {
             container.querySelectorAll(sel).forEach(el => el.remove());
           }
 
+          // Remove boilerplate sections based on heading text
+          removeBoilerplateHeadings(container);
+
           const afterText = (container.innerText || '').substring(0, 200);
           console.log('[JOB SCRAPER] After stripping (first 200 chars):', afterText);
           console.log('[JOB SCRAPER] After stripping, container children:', container.children.length);
           return container;
+        }
+
+        // Helper function to remove boilerplate sections based on heading patterns
+        function removeBoilerplateHeadings(container) {
+          // Patterns for headings that indicate boilerplate content
+          const boilerplatePatterns = [
+            /^how\s+to\s+apply$/i,
+            /^apply\s+(here|now)$/i,
+            /^application\s+(process|deadline|instructions)$/i,
+            /^required\s+documents$/i,
+            /^interview\s+(process|details)$/i,
+            /^(compensation|salary)\s+&\s+benefits$/i,
+            /^(compensation|salary|benefits|what\s+we\s+offer)$/i,
+            /^(location|work\s+(location|from)|remote)$/i,
+            /^about\s+(the\s+)?company$/i,
+            /^(company\s+culture|our\s+mission|diversity\s+&\s+inclusion)$/i,
+            /^(eeo\s+statement|equal\s+opportunity|privacy|disclaimer)$/i,
+            /^(deadline|next\s+steps)$/i,
+          ];
+
+          // Find all headings in the container
+          const headings = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+
+          // Iterate through headings and remove matching sections
+          for (const heading of headings) {
+            const headingText = heading.textContent.trim();
+
+            // Check if heading matches any boilerplate pattern
+            const isBoilerplate = boilerplatePatterns.some(pattern => pattern.test(headingText));
+
+            if (isBoilerplate) {
+              const headingLevel = parseInt(heading.tagName[1]);
+              console.log(`[JOB SCRAPER] Removing boilerplate section: "${headingText}"`);
+
+              // Remove the heading itself
+              let nextElement = heading.nextElementSibling;
+              heading.remove();
+
+              // Remove all following elements until we hit a heading of same or higher level
+              while (nextElement) {
+                const elementToRemove = nextElement;
+                nextElement = nextElement.nextElementSibling;
+
+                // If we hit another heading, check its level
+                if (elementToRemove.tagName && elementToRemove.tagName.match(/^H[1-6]$/i)) {
+                  const nextHeadingLevel = parseInt(elementToRemove.tagName[1]);
+                  if (nextHeadingLevel <= headingLevel) {
+                    // Stop here, don't remove this heading
+                    break;
+                  }
+                }
+
+                elementToRemove.remove();
+              }
+            }
+          }
         }
 
         // ── Fallback: Job title extraction ──
