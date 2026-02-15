@@ -282,135 +282,91 @@ async function scrapeCurrentTab() {
           return result;
         }
 
-        // ── Boilerplate stripping for descriptions ──
+        // ── Minimal cleanup: only remove obvious UI elements, not content ──
         function stripBoilerplateFromHtml(container) {
-          // Phase 1: Remove elements by selector
+          console.log('[JOB SCRAPER] stripBoilerplate called, container children:', container.children.length);
+          const beforeText = (container.innerText || '').substring(0, 200);
+          console.log('[JOB SCRAPER] Before stripping (first 200 chars):', beforeText);
+
+          // Only remove obvious non-content elements
           const removeSelectors = [
             'nav', 'header', 'footer',
             '.nav', '.header', '.footer', '.sidebar',
             '.cookie-banner', '.social-share',
             '[class*="apply-button"]', '[class*="apply-now"]',
             '[class*="similar-jobs"]', '[class*="related-jobs"]', '[class*="related-positions"]',
-            '[class*="cookie"]', '[class*="privacy"]',
+            '[class*="cookie"]',
             'script', 'style', 'noscript', 'iframe',
+            '[role="alert"]', '[role="dialog"]', '[class*="modal"]',
+            '[class*="toast"]', '[class*="notification"]',
           ];
           for (const sel of removeSelectors) {
             container.querySelectorAll(sel).forEach(el => el.remove());
           }
 
-          // Phase 2: Remove sections by heading text content
-          const boilerplateHeadings = [
-            /equal\s+(?:opportunity|employment)/i,
-            /\beeo\b/i,
-            /(?:we\s+(?:do\s+not|don.t)\s+discriminate)/i,
-            /non[- ]?discrimination/i,
-            /affirmative\s+action/i,
-            /privacy\s+(?:policy|notice|statement)/i,
-            /cookie\s+(?:policy|notice)/i,
-            /similar\s+(?:jobs|roles)/i,
-            /related\s+(?:jobs|positions|roles)/i,
-            /how\s+to\s+apply/i,
-            /application\s+(?:instructions|process|deadline)/i,
-            /about\s+(?:us|the\s+company)/i,
-            /who\s+we\s+are/i,
-            /our\s+(?:company|mission|values|culture|story)/i,
-            /benefits\s+(?:&|and)\s+perks/i,
-            /what\s+we\s+offer/i,
-            /perks\s+(?:&|and)\s+benefits/i,
-            /diversity\s+(?:&|and)\s+inclusion/i,
-            /work\s+authorization/i,
-            /physical\s+(?:requirements|demands)/i,
-            /(?:our\s+)?commitment\s+to\s+(?:diversity|inclusion|equity)/i,
-            /\baccommodations?\b/i,
-            /\bdisclaimer\b/i,
-          ];
+          // Remove boilerplate sections based on heading text
+          removeBoilerplateHeadings(container);
 
-          const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
-          for (const heading of headings) {
-            const text = heading.textContent.trim();
-            const isBoilerplate = boilerplateHeadings.some(p => p.test(text));
-            if (!isBoilerplate) continue;
-            // If inside a dedicated section/div, remove the container
-            const section = heading.closest('section, [class*="section"], [class*="block"]');
-            if (section && section !== container) { section.remove(); continue; }
-            // Otherwise remove heading + following siblings until next same-or-higher heading
-            const headingLevel = heading.tagName.match(/^H(\d)$/i);
-            const level = headingLevel ? parseInt(headingLevel[1]) : 99;
-            let sibling = heading.nextElementSibling;
-            const toRemove = [heading];
-            while (sibling) {
-              const sibTag = sibling.tagName.match(/^H(\d)$/i);
-              if (sibTag && parseInt(sibTag[1]) <= level) break;
-              toRemove.push(sibling);
-              sibling = sibling.nextElementSibling;
-            }
-            toRemove.forEach(el => el.remove());
-          }
-
-          // Phase 3: Remove standalone EEO/legal paragraphs by text content
-          const eeoPatterns = [
-            /equal\s+opportunity\s+employer/i,
-            /we\s+(?:are\s+an?\s+)?(?:equal\s+opportunity|affirmative\s+action)/i,
-            /(?:we\s+)?(?:do\s+not|don.t)\s+discriminate/i,
-            /race,?\s+color,?\s+religion/i,
-            /protected\s+(?:class|characteristic|status|veteran)/i,
-            /reasonable\s+accommodation/i,
-            /\be-verify\b/i,
-            /background\s+check\s+(?:will|may)\s+be\s+(?:conducted|required)/i,
-            /all\s+qualified\s+applicants\s+will\s+receive\s+consideration/i,
-            /without\s+regard\s+to\s+(?:race|age|sex|gender|national\s+origin|disability)/i,
-            /pursuant\s+to\s+(?:applicable|state|local|federal)/i,
-            /(?:will\s+not|does\s+not)\s+(?:provide|sponsor)\s+(?:work\s+authorization|visa|immigration)/i,
-            /visa\s+sponsorship\s+(?:is\s+not\s+)?(?:available|provided|offered)/i,
-            /above\s+statements?\s+(?:are\s+)?intended\s+to\s+describe/i,
-            /this\s+(?:job\s+)?description\s+is\s+not\s+designed/i,
-            /is\s+(?:an?\s+)?(?:equal[\s-]opportunity|eeo|affirmative\s+action)\s+employer/i,
-            /is\s+committed\s+to\s+(?:equal|diversity|inclusion|creating\s+a\s+diverse)/i,
-            /we\s+celebrate\s+diversity/i,
-            /employment\s+is\s+contingent\s+(?:upon|on)/i,
-            /\bdrug\s+(?:screen|test|free\s+workplace)\b/i,
-            /must\s+be\s+able\s+to\s+(?:lift|stand|sit|walk|bend|stoop)/i,
-            /your\s+(?:personal\s+)?information\s+will\s+be\s+kept\s+confidential/i,
-            /pay\s+(?:range|scale|transparency)[:\s]/i,
-          ];
-          const allParagraphs = container.querySelectorAll('p, li, div > span');
-          for (let i = allParagraphs.length - 1; i >= 0; i--) {
-            const p = allParagraphs[i];
-            const text = p.textContent.trim();
-            if (text.length === 0) continue;
-            if (eeoPatterns.some(pattern => pattern.test(text))) p.remove();
-          }
-
-          // Phase 4: Remove trailing legal/boilerplate blocks from the bottom up
-          const trailingPatterns = [
-            /equal\s+opportunity/i,
-            /all\s+qualified\s+applicants/i,
-            /without\s+regard\s+to/i,
-            /pursuant\s+to/i,
-            /visa\s+sponsorship/i,
-            /work\s+authorization/i,
-            /background\s+check/i,
-            /reasonable\s+accommodation/i,
-            /is\s+committed\s+to\s+(?:diversity|equal|inclusion)/i,
-            /employment\s+is\s+contingent/i,
-            /drug\s+(?:screen|test)/i,
-            /above\s+statements?\s+(?:are\s+)?intended/i,
-            /this\s+(?:job\s+)?description\s+is\s+not\s+designed/i,
-            /pay\s+(?:range|scale)[:\s]/i,
-            /salary\s+range[:\s]+\$/i,
-          ];
-          const topChildren = Array.from(container.children);
-          for (let i = topChildren.length - 1; i >= 0; i--) {
-            const text = topChildren[i].textContent.trim();
-            if (!text) { topChildren[i].remove(); continue; }
-            if (trailingPatterns.some(p => p.test(text))) {
-              topChildren[i].remove();
-            } else {
-              break;
-            }
-          }
-
+          const afterText = (container.innerText || '').substring(0, 200);
+          console.log('[JOB SCRAPER] After stripping (first 200 chars):', afterText);
+          console.log('[JOB SCRAPER] After stripping, container children:', container.children.length);
           return container;
+        }
+
+        // Helper function to remove boilerplate sections based on heading patterns
+        function removeBoilerplateHeadings(container) {
+          // Patterns for headings that indicate boilerplate content
+          const boilerplatePatterns = [
+            /^how\s+to\s+apply$/i,
+            /^apply\s+(here|now)$/i,
+            /^application\s+(process|deadline|instructions)$/i,
+            /^required\s+documents$/i,
+            /^interview\s+(process|details)$/i,
+            /^(compensation|salary)\s+&\s+benefits$/i,
+            /^(compensation|salary|benefits|what\s+we\s+offer)$/i,
+            /^(location|work\s+(location|from)|remote)$/i,
+            /^about\s+(the\s+)?company$/i,
+            /^(company\s+culture|our\s+mission|diversity\s+&\s+inclusion)$/i,
+            /^(eeo\s+statement|equal\s+opportunity|privacy|disclaimer)$/i,
+            /^(deadline|next\s+steps)$/i,
+          ];
+
+          // Find all headings in the container
+          const headings = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+
+          // Iterate through headings and remove matching sections
+          for (const heading of headings) {
+            const headingText = heading.textContent.trim();
+
+            // Check if heading matches any boilerplate pattern
+            const isBoilerplate = boilerplatePatterns.some(pattern => pattern.test(headingText));
+
+            if (isBoilerplate) {
+              const headingLevel = parseInt(heading.tagName[1]);
+              console.log(`[JOB SCRAPER] Removing boilerplate section: "${headingText}"`);
+
+              // Remove the heading itself
+              let nextElement = heading.nextElementSibling;
+              heading.remove();
+
+              // Remove all following elements until we hit a heading of same or higher level
+              while (nextElement) {
+                const elementToRemove = nextElement;
+                nextElement = nextElement.nextElementSibling;
+
+                // If we hit another heading, check its level
+                if (elementToRemove.tagName && elementToRemove.tagName.match(/^H[1-6]$/i)) {
+                  const nextHeadingLevel = parseInt(elementToRemove.tagName[1]);
+                  if (nextHeadingLevel <= headingLevel) {
+                    // Stop here, don't remove this heading
+                    break;
+                  }
+                }
+
+                elementToRemove.remove();
+              }
+            }
+          }
         }
 
         // ── Fallback: Job title extraction ──
@@ -467,13 +423,29 @@ async function scrapeCurrentTab() {
             const parts = window.location.pathname.split("/").filter(Boolean);
             if (parts.length > 0) return formatCompanyName(parts[0]);
           }
+          if (hostname.includes("hubspot.com")) {
+            return "HubSpot";
+          }
           const ogSiteName = document.querySelector('meta[property="og:site_name"]');
-          if (ogSiteName && ogSiteName.content) return ogSiteName.content.trim();
+          if (ogSiteName && ogSiteName.content) {
+            const siteName = ogSiteName.content.trim();
+            // Skip if it looks like UI text, not a company name
+            if (!/^(all\s+openings|careers|jobs|positions|apply\s+now|work\s+with\s+us)/i.test(siteName)) {
+              return siteName;
+            }
+          }
           const title = document.title || "";
           const atMatch = title.match(/\bat\s+(.+?)(?:\s*[|\-\u2013\u2014]|$)/i);
           if (atMatch) return atMatch[1].trim();
           const titleParts = title.split(/\s*[|\-\u2013\u2014]\s*/);
-          if (titleParts.length >= 2) return titleParts[titleParts.length - 1].trim();
+          if (titleParts.length >= 2) {
+            const lastPart = titleParts[titleParts.length - 1].trim();
+            // Only use if it looks like a company name (not UI text)
+            if (lastPart.length >= 2 && lastPart.length <= 60 &&
+                !/^(all\s+openings|apply\s+now|careers|jobs|positions)/i.test(lastPart)) {
+              return lastPart;
+            }
+          }
           const companySelectors = ['[data-company-name]', '.company-name', '.employer-name', '[class*="company"]', '[class*="employer"]'];
           for (const sel of companySelectors) {
             const el = document.querySelector(sel);
@@ -618,7 +590,61 @@ async function scrapeCurrentTab() {
           return "";
         }
 
-        // ── Description extraction (improved with boilerplate stripping) ──
+        // ── Heuristic: find the deepest, most structured job content block ──
+        function findLargestContentBlock() {
+          function getDepth(el) {
+            let depth = 0;
+            let node = el;
+            while (node.parentElement) { depth++; node = node.parentElement; }
+            return depth;
+          }
+
+          const candidates = document.querySelectorAll('div, section, article, main, [role="main"]');
+          let best = null;
+          let bestScore = 0;
+
+          for (const el of candidates) {
+            // Skip body and elements inside navigational areas
+            if (el === document.body) continue;
+            if (el.closest('nav, header, footer, [class*="sidebar"], [class*="cookie"], [class*="modal"]')) continue;
+
+            const text = el.innerText || '';
+            if (text.length < 300) continue;  // Minimum content length
+
+            // Count job posting structure elements
+            const h2Count = el.querySelectorAll('h2').length;
+            const h3Count = el.querySelectorAll('h3').length;
+            const ulCount = el.querySelectorAll('ul').length;
+            const liCount = el.querySelectorAll('li').length;
+            const pCount = el.querySelectorAll('p').length;
+
+            // Job postings have multiple headings, lists, and paragraphs
+            // Prefer deeper elements (more specific content) over shallow ones
+            const depth = getDepth(el);
+            const structureScore = (h2Count * 100) + (h3Count * 60) + (ulCount * 50) + (liCount * 5) + (pCount * 2);
+            const depthBonus = depth * 3;  // Prefer deeper elements (more specific)
+            const textScore = Math.min(text.length / 100, 100);  // Cap text score
+
+            // Must have job posting structure (at least some headings/lists)
+            if (structureScore < 50) continue;
+
+            const score = structureScore + depthBonus + textScore;
+
+            console.log('[JOB SCRAPER] Candidate:', el.tagName, 'class:', el.className, 'h2:', h2Count, 'h3:', h3Count, 'ul:', ulCount, 'depth:', depth, 'score:', Math.round(score));
+
+            if (score > bestScore) {
+              best = el;
+              bestScore = score;
+            }
+          }
+
+          if (best) {
+            console.log('[JOB SCRAPER] Heuristic winner:', best.tagName, 'class:', best.className, 'score:', Math.round(bestScore));
+          }
+          return best;
+        }
+
+        // ── Description extraction ──
         function extractDescription(jsonLdHtml) {
           let clone;
           if (jsonLdHtml) {
@@ -630,14 +656,32 @@ async function scrapeCurrentTab() {
               '[class*="job-description"]', '[class*="jobDescription"]', '[class*="job_description"]',
               '[id*="job-description"]', '[id*="jobDescription"]',
               '.posting-page', '.content-wrapper .posting', '[data-qa="job-description"]',
-              '.job-details', '.job-content', '.description',
+              '.job-details', '.job-content',
+              '[class*="job-post"]', '[class*="jobPost"]', '[id*="job-post"]',
+              '[class*="posting-"]', '[id*="posting"]',
+              '[class*="content-body"]', '[class*="contentBody"]',
+              '[data-automation-id="jobPostingDescription"]',
+              '[class*="job-info"]', '[class*="jobInfo"]',
+              // ATS and platform-specific
+              '#react-root-directory', '[data-altru-post]',
+              '[id*="greenhouse"]', '[class*="greenhouse"]',
+              '[class*="workday"]', '[id*="workday"]',
+              // Generic content containers (try to find by structure)
+              'div[class*="hsg-page"]', 'div[class*="page-width"]',
               'article', 'main', '[role="main"]',
             ];
             let contentEl = null;
             for (const sel of contentSelectors) {
               contentEl = document.querySelector(sel);
-              if (contentEl) break;
+              if (contentEl) {
+                console.log('[JOB SCRAPER] Selected with selector:', sel, 'Element:', contentEl.className || contentEl.id || contentEl.tagName);
+                break;
+              }
             }
+            // Heuristic fallback: find the most structured job content block
+            if (!contentEl) contentEl = findLargestContentBlock();
+            if (!contentEl) console.log('[JOB SCRAPER] No element found, falling back to body');
+            // Last resort: use body
             if (!contentEl) contentEl = document.body;
             clone = contentEl.cloneNode(true);
           }
@@ -645,6 +689,8 @@ async function scrapeCurrentTab() {
           stripBoilerplateFromHtml(clone);
 
           let markdown = elementToMarkdown(clone);
+          console.log('[JOB SCRAPER] After stripping, markdown length:', markdown.length);
+          console.log('[JOB SCRAPER] First 500 chars:', markdown.substring(0, 500));
           // Clean up whitespace
           markdown = markdown.replace(/\t/g, " ").replace(/ {2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
           if (markdown.length > 50000) {
