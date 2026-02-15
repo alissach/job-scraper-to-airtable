@@ -364,13 +364,29 @@ async function scrapeCurrentTab() {
             const parts = window.location.pathname.split("/").filter(Boolean);
             if (parts.length > 0) return formatCompanyName(parts[0]);
           }
+          if (hostname.includes("hubspot.com")) {
+            return "HubSpot";
+          }
           const ogSiteName = document.querySelector('meta[property="og:site_name"]');
-          if (ogSiteName && ogSiteName.content) return ogSiteName.content.trim();
+          if (ogSiteName && ogSiteName.content) {
+            const siteName = ogSiteName.content.trim();
+            // Skip if it looks like UI text, not a company name
+            if (!/^(all\s+openings|careers|jobs|positions|apply\s+now|work\s+with\s+us)/i.test(siteName)) {
+              return siteName;
+            }
+          }
           const title = document.title || "";
           const atMatch = title.match(/\bat\s+(.+?)(?:\s*[|\-\u2013\u2014]|$)/i);
           if (atMatch) return atMatch[1].trim();
           const titleParts = title.split(/\s*[|\-\u2013\u2014]\s*/);
-          if (titleParts.length >= 2) return titleParts[titleParts.length - 1].trim();
+          if (titleParts.length >= 2) {
+            const lastPart = titleParts[titleParts.length - 1].trim();
+            // Only use if it looks like a company name (not UI text)
+            if (lastPart.length >= 2 && lastPart.length <= 60 &&
+                !/^(all\s+openings|apply\s+now|careers|jobs|positions)/i.test(lastPart)) {
+              return lastPart;
+            }
+          }
           const companySelectors = ['[data-company-name]', '.company-name', '.employer-name', '[class*="company"]', '[class*="employer"]'];
           for (const sel of companySelectors) {
             const el = document.querySelector(sel);
