@@ -1,13 +1,10 @@
 # CLAUDE.md
 
 ## Project Overview
-Chrome Extension that scrapes job postings from various job boards and saves them to Airtable. Includes a Next.js web app (currently scaffold/placeholder).
+Chrome Extension that scrapes job postings from various job boards and saves them to Airtable.
 
 ## Tech Stack
 - **Chrome Extension:** Vanilla JavaScript, Manifest v3
-- **Web App:** Next.js 16, React 19, TypeScript
-- **UI:** Tailwind CSS, Radix UI (shadcn/ui)
-- **Package Manager:** pnpm
 
 ## Key Files
 - `chrome-extension/popup.js` — Main popup UI & scraping orchestration
@@ -32,11 +29,6 @@ Chrome Extension that scrapes job postings from various job boards and saves the
 - Credentials stored in `chrome.storage.sync` (token, baseId, tableName)
 - Fields: Job Title, Company, Location, Salary Range, Job Description (Markdown), URL
 - No hardcoded credentials
-
-## Commands
-- `pnpm dev` — Run Next.js dev server
-- `pnpm build` — Build Next.js app
-- `pnpm lint` — Run linter
 
 ## Rules
 - Keep scraping logic in content.js, API calls in background.js (separation of concerns)
