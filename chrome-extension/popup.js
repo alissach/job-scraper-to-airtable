@@ -423,9 +423,6 @@ async function scrapeCurrentTab() {
             const parts = window.location.pathname.split("/").filter(Boolean);
             if (parts.length > 0) return formatCompanyName(parts[0]);
           }
-          if (hostname.includes("hubspot.com")) {
-            return "HubSpot";
-          }
           const ogSiteName = document.querySelector('meta[property="og:site_name"]');
           if (ogSiteName && ogSiteName.content) {
             const siteName = ogSiteName.content.trim();
@@ -446,7 +443,16 @@ async function scrapeCurrentTab() {
               return lastPart;
             }
           }
-          const companySelectors = ['[data-company-name]', '.company-name', '.employer-name', '[class*="company"]', '[class*="employer"]'];
+          // Domain-based extraction (skip job boards and ATS platforms)
+          const jobBoards = ["indeed", "linkedin", "glassdoor", "ziprecruiter", "monster", "dice", "simplyhired", "careerbuilder", "greenhouse", "ashbyhq", "lever", "workday", "icims", "smartrecruiters", "jobvite", "breezy", "recruitee", "applytojob"];
+          const domainParts = hostname.replace(/^www\./, "").split(".");
+          if (domainParts.length >= 2) {
+            const name = domainParts[domainParts.length - 2];
+            if (name && name.length >= 2 && !jobBoards.includes(name.toLowerCase())) {
+              return formatCompanyName(name);
+            }
+          }
+          const companySelectors = ['[data-company-name]', '.company-name', '.employer-name'];
           for (const sel of companySelectors) {
             const el = document.querySelector(sel);
             if (el && el.textContent.trim().length > 1) return el.textContent.trim();

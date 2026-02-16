@@ -142,6 +142,15 @@
       line-height: 1.4;
     }
 
+    .field-hint a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .field-hint a:hover {
+      text-decoration: underline;
+    }
+
     .field-hint code {
       background: var(--surface-hover);
       padding: 1px 4px;
@@ -248,6 +257,15 @@
       line-height: 1.5;
     }
 
+    .help-steps a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .help-steps a:hover {
+      text-decoration: underline;
+    }
+
     .help-steps li::before {
       content: counter(steps);
       flex-shrink: 0;
@@ -282,7 +300,7 @@
         <input type="password" id="token" placeholder="pat_xxxxxxxxxxxxxxx" />
         <div class="field-hint">
           Generate one at <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">airtable.com/create/tokens</a>.
-          Needs <code>data.records:write</code> scope.
+          Needs <code>data.records:read</code> and <code>data.records:write</code> scopes.
         </div>
       </div>
 
@@ -339,11 +357,11 @@
     <div class="help-section">
       <h3>Setup Guide</h3>
       <ol class="help-steps">
-        <li>Go to <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener" style="color: var(--accent);">airtable.com/create/tokens</a> and create a new token</li>
-        <li>Give it <strong>data.records:write</strong> scope and access to your base</li>
-        <li>Copy the Base ID from your Airtable base URL (starts with "app")</li>
-        <li>Enter your table name exactly as it appears in the tab</li>
-        <li>Click "Test Connection" to verify everything works</li>
+        <li><span>Go to <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">airtable.com/create/tokens</a> and create a new token</span></li>
+        <li><span>Give it <strong>data.records:read</strong> and <strong>data.records:write</strong> scopes, and access to your base</span></li>
+        <li><span>Copy the Base ID from your Airtable base URL (starts with "app")</span></li>
+        <li><span>Enter your table name exactly as it appears in the tab</span></li>
+        <li><span>Click "Test Connection" to verify everything works</span></li>
       </ol>
     </div>
   </div>
