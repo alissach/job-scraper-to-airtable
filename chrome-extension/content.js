@@ -231,12 +231,12 @@
    * Checks URL patterns, og:site_name, page title patterns, and common selectors
    */
   function extractCompany() {
-    // Greenhouse pattern: company.greenhouse.io
+    // Greenhouse: boards.greenhouse.io/{company} or job-boards.greenhouse.io/{company}/jobs/{id}
     const hostname = window.location.hostname;
     if (hostname.includes("greenhouse.io")) {
-      const sub = hostname.split(".greenhouse.io")[0].replace("boards.", "");
-      if (sub && sub !== "www") {
-        return formatCompanyName(sub);
+      const parts = window.location.pathname.split("/").filter(Boolean);
+      if (parts.length > 0) {
+        return formatCompanyName(parts[0]);
       }
     }
 

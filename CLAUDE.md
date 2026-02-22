@@ -14,10 +14,12 @@ Chrome Extension that scrapes job postings from various job boards and saves the
 - `chrome-extension/richtext-utils.js` — HTML to Markdown converter
 
 ## Architecture
-1. User clicks extension → `popup.js` injects `content.js` into the page
-2. `content.js` extracts job data (JSON-LD first, then DOM selectors as fallback)
+1. User clicks extension → `popup.js` runs `chrome.scripting.executeScript` with inline scraping functions
+2. Inline functions in `popup.js` extract job data (JSON-LD first, then DOM selectors as fallback)
 3. User reviews data in popup form
 4. On save → `background.js` calls Airtable API (keeps token out of content script)
+
+> Note: `content.js` exists but the active scraping logic is inline in `popup.js`. When fixing scraping bugs, look in `popup.js` first.
 
 ## Scraping Conventions
 - **JSON-LD is primary** — schema.org JobPosting structured data is most reliable
@@ -31,6 +33,7 @@ Chrome Extension that scrapes job postings from various job boards and saves the
 - No hardcoded credentials
 
 ## Rules
-- Keep scraping logic in content.js, API calls in background.js (separation of concerns)
-- Prefer domain-based extraction over hardcoded company names
+- Scraping logic lives inline in `popup.js`; API calls in `background.js`
+- Prefer path-based extraction over subdomain for job board company names
+- Greenhouse company is in the first path segment (not the subdomain)
 - Always update CLAUDE.md when project structure or conventions change
