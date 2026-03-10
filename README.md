@@ -26,7 +26,7 @@ Note: this is still in development and may not work for all job postings. Feel f
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/your-username/job-posting-to-airtable.git
+   git clone https://github.com/alissach/job-scraper-to-airtable.git
    ```
 2. Open Chrome and go to `chrome://extensions/`
 3. Enable **Developer mode** (toggle in the top right)
