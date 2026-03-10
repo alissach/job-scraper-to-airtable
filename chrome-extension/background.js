@@ -76,8 +76,7 @@ async function saveToAirtable(jobData) {
   return await response.json();
 }
 
-// Maps a raw scraped location string to one of the Applications table's multiselect options.
-// Options: Remote, Seattle, NYC, Remote-first, Bellevue, Other/Unknown
+// Normalizes raw scraped location text to a readable label.
 function mapLocation(location) {
   const loc = (location || "").toLowerCase();
   if (loc.includes("seattle")) return "Seattle";
@@ -85,7 +84,7 @@ function mapLocation(location) {
   if (loc.includes("new york") || loc.includes("nyc")) return "NYC";
   if (loc.includes("remote-first") || loc.includes("remote first")) return "Remote-first";
   if (loc.includes("remote")) return "Remote";
-  return "Other/Unknown";
+  return location || "";
 }
 
 async function saveToApps(jobData) {

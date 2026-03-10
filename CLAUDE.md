@@ -32,8 +32,8 @@ Chrome Extension that scrapes job postings from various job boards and saves the
 - PAT requires only `data.records:write` scope
 - Two save destinations, each with its own background function and message action:
   - `saveToAirtable` → Job Scraper table: Job Title, Company, Location, Salary Range, Job Description, URL
-  - `saveToApps` → Applications table: Role or Job ID, Employer, Location (single select via `mapLocation()`), Salary Range, Job Description, URL
-- `mapLocation()` in background.js normalizes raw location text to: Remote, Seattle, NYC, Remote-first, Bellevue, Other/Unknown
+  - `saveToApps` → Applications table: Role or Job ID, Employer, Location (normalized via `mapLocation()`), Salary Range, Job Description, URL
+- `mapLocation()` in background.js normalizes raw location text to readable labels: Remote, Seattle, NYC, Remote-first, Bellevue, or raw text as fallback
 - No hardcoded credentials
 
 ## Rules
