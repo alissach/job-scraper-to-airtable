@@ -20,7 +20,7 @@ Note: this is still in development and may not work for all job postings. Feel f
 2. Click the extension icon in your toolbar
 3. The extension scrapes the page — first checking for JSON-LD structured data (`schema.org/JobPosting`), then falling back to platform-specific DOM selectors and heuristic scoring
 4. Review the extracted fields (Job Title, Company, Location, Salary Range, Description, URL)
-5. Click **Save to Airtable** to create a record in your configured table
+5. Click **Save for later** to save to your Job Scraper table, or **Add to apps** to log it directly to your Applications table
 
 ## Installation
 
@@ -41,7 +41,7 @@ Note: this is still in development and may not work for all job postings. Feel f
 1. Go to [airtable.com/create/tokens](https://airtable.com/create/tokens)
 2. Click **Create new token**
 3. Give it a name (e.g., "Job Scraper")
-4. Under **Scopes**, add `data.records:read` and `data.records:write`
+4. Under **Scopes**, add `data.records:write`
 5. Under **Access**, add the base you want to use
 6. Copy the token (starts with `pat`)
 
@@ -51,25 +51,42 @@ Note: this is still in development and may not work for all job postings. Feel f
 2. The Base ID is in the URL: `https://airtable.com/appXXXXXXXXXXXXXX/...`
 3. Copy the part starting with `app`
 
-### 3. Create the Table
+### 3. Create Your Tables
 
-Create a table in your Airtable base with the following columns:
+The extension supports two save destinations, each configured separately in settings.
 
-| Column Name     | Field Type       | Notes                          |
-|-----------------|------------------|--------------------------------|
-| Job Title       | Single line text |                                |
-| Company         | Single line text |                                |
-| Location        | Single line text | e.g., "Austin, TX (Remote)"   |
-| Salary Range    | Single line text | e.g., "$120,000 - $160,000/yr"|
-| Job Description | Long text        | Enable Markdown/rich text      |
-| URL             | URL              | Link to the original posting   |
+#### Job Scraper table — "Save for later"
 
-> The table name is **case-sensitive** — it must match exactly what you enter in the extension settings.
+A lightweight table for bookmarking postings to review later.
+
+| Column Name     | Field Type       | Notes                           |
+|-----------------|------------------|---------------------------------|
+| Job Title       | Single line text |                                 |
+| Company         | Single line text |                                 |
+| Location        | Single line text | e.g., "Austin, TX (Remote)"    |
+| Salary Range    | Single line text | e.g., "$120,000 - $160,000/yr" |
+| Job Description | Long text        | Enable Markdown/rich text       |
+| URL             | URL              | Link to the original posting    |
+
+#### Applications table — "Add to apps"
+
+A tracking table for jobs you're actively applying to. The Location field is automatically mapped from the raw scraped text to a predefined option.
+
+| Column Name    | Field Type                | Notes                                                        |
+|----------------|---------------------------|--------------------------------------------------------------|
+| Role or Job ID | Single line text          |                                                              |
+| Employer       | Single line text          |                                                              |
+| Location       | Single select             | Options: Remote, Seattle, NYC, Remote-first, Bellevue, Other/Unknown |
+| Salary Range   | Single line text          |                                                              |
+| Job Description| Long text                 | Enable Markdown/rich text                                    |
+| URL            | URL                       | Link to the original posting                                 |
+
+> Column names are **case-sensitive** — they must match exactly as shown above.
 
 ## Configuration
 
 1. Right-click the extension icon and select **Options** (or click the gear icon in the popup)
-2. Enter your **Personal Access Token**, **Base ID**, and **Table Name**
+2. Enter your **Personal Access Token**, **Base ID**, **Job Scraper Table Name**, and optionally **Applications Table Name**
 3. Click **Test Connection** to verify your credentials
 4. Save your settings
 
@@ -105,7 +122,7 @@ chrome-extension/
 ├── options.html         # Settings page UI
 ├── options.js           # Settings management and credential validation
 ├── content.js           # Content script for DOM access
-└── richtext-utils.js    # HTML to Airtable rich text conversion
+└── richtext-utils.js    # Unused (legacy rich text array approach)
 ```
 
 ## License

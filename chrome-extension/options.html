@@ -266,6 +266,14 @@
       text-decoration: underline;
     }
 
+    .setup-table tbody tr:nth-child(odd) td {
+      background: var(--surface-hover);
+    }
+
+    .setup-table td, .setup-table th {
+      padding: 4px 6px;
+    }
+
     .help-steps li::before {
       content: counter(steps);
       flex-shrink: 0;
@@ -290,6 +298,60 @@
     </div>
 
     <div class="card">
+      <div class="card-title">Setup Guide</div>
+      <ol class="help-steps">
+        <li>
+          <span>Go to <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">airtable.com/create/tokens</a> and create a new token. Give it the <strong>data.records:write</strong> scope and access to your base.</span>
+        </li>
+        <li>
+          <span>Find your <strong>Base ID</strong> in the Airtable URL: <code>airtable.com/appXXXXX/...</code> — it starts with <code>app</code>.</span>
+        </li>
+        <li>
+          <span>
+            In your Airtable base, create two tables with these exact column names (case-sensitive).
+            <div style="margin-top: 10px;">
+              <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">"Save for later" table</div>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px;">For jobs you want to bookmark but aren't ready to apply to yet.</div>
+              <table class="setup-table" style="width: 100%; font-size: 11px; border-collapse: collapse; table-layout: fixed; margin-bottom: 14px;">
+                <colgroup><col style="width: 40%"><col style="width: 60%"></colgroup>
+                <thead><tr style="border-bottom: 1px solid var(--border);">
+                  <th style="text-align: left; color: var(--text-muted); font-weight: 500;">Column</th>
+                  <th style="text-align: left; color: var(--text-muted); font-weight: 500;">Type</th>
+                </tr></thead>
+                <tbody style="color: var(--text-secondary);">
+                  <tr><td style="">Job Title</td><td style="">Single line text</td></tr>
+                  <tr><td style="">Company</td><td style="">Single line text</td></tr>
+                  <tr><td style="">Location</td><td style="">Single line text</td></tr>
+                  <tr><td style="">Salary Range</td><td style="">Single line text</td></tr>
+                  <tr><td style="">Job Description</td><td style="">Long text (Markdown)</td></tr>
+                  <tr><td style="">URL</td><td style="">URL</td></tr>
+                </tbody>
+              </table>
+              <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">"Add to applications" table</div>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px;">For jobs you plan to apply to right away.</div>
+              <table class="setup-table" style="width: 100%; font-size: 11px; border-collapse: collapse; table-layout: fixed;">
+                <colgroup><col style="width: 40%"><col style="width: 60%"></colgroup>
+                <thead><tr style="border-bottom: 1px solid var(--border);">
+                  <th style="text-align: left; color: var(--text-muted); font-weight: 500;">Column</th>
+                  <th style="text-align: left; color: var(--text-muted); font-weight: 500;">Type</th>
+                </tr></thead>
+                <tbody style="color: var(--text-secondary);">
+                  <tr><td style="">Role or Job ID</td><td style="">Single line text</td></tr>
+                  <tr><td style="">Employer</td><td style="">Single line text</td></tr>
+                  <tr><td style="">Location</td><td style="word-wrap: break-word;">Single select — Remote, Seattle, NYC, Remote-first, Bellevue, Other/Unknown</td></tr>
+                  <tr><td style="">Salary Range</td><td style="">Single line text</td></tr>
+                  <tr><td style="">Job Description</td><td style="">Long text (Markdown)</td></tr>
+                  <tr><td style="">URL</td><td style="">URL</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </span>
+        </li>
+        <li><span>Enter your credentials below and click <strong>Test Connection</strong> to verify everything works.</span></li>
+      </ol>
+    </div>
+
+    <div class="card">
       <div class="card-title">Airtable Connection</div>
       <div class="card-desc">
         Your credentials are stored locally in Chrome and never sent anywhere except Airtable's API.
@@ -299,25 +361,26 @@
         <label for="token">Personal Access Token</label>
         <input type="password" id="token" placeholder="pat_xxxxxxxxxxxxxxx" />
         <div class="field-hint">
-          Generate one at <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">airtable.com/create/tokens</a>.
-          Needs <code>data.records:read</code> and <code>data.records:write</code> scopes.
+          Generate at <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">airtable.com/create/tokens</a>.
+          Needs <code>data.records:write</code> scope.
         </div>
       </div>
 
       <div class="form-group">
         <label for="baseId">Base ID</label>
         <input type="text" id="baseId" placeholder="appXXXXXXXXXXXXXX" />
-        <div class="field-hint">
-          Find it in your Airtable base URL: <code>airtable.com/appXXXXX/...</code>
-        </div>
       </div>
 
       <div class="form-group">
-        <label for="tableName">Table Name</label>
+        <label for="tableName">"Save for later" Table Name</label>
         <input type="text" id="tableName" placeholder="Job Postings" />
-        <div class="field-hint">
-          Exact name of the table tab in your base (case-sensitive).
-        </div>
+        <div class="field-hint">Case-sensitive. Must match the tab name exactly.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="appsTableName">"Add to applications" Table Name</label>
+        <input type="text" id="appsTableName" placeholder="Applications" />
+        <div class="field-hint">Case-sensitive. Must match the tab name exactly.</div>
       </div>
 
       <div class="button-row">
@@ -328,41 +391,6 @@
       <div class="status" id="status">
         <span id="statusText"></span>
       </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Expected Airtable Columns</div>
-      <div class="card-desc">
-        Make sure your table has these exact column names. The field types should match too.
-      </div>
-
-      <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
-        <thead>
-          <tr style="border-bottom: 1px solid var(--border);">
-            <th style="text-align: left; padding: 6px 0; color: var(--text-muted); font-weight: 500;">Column Name</th>
-            <th style="text-align: left; padding: 6px 0; color: var(--text-muted); font-weight: 500;">Field Type</th>
-          </tr>
-        </thead>
-        <tbody style="color: var(--text-secondary);">
-          <tr><td style="padding: 6px 0;">Job Title</td><td style="padding: 6px 0;">Single line text</td></tr>
-          <tr><td style="padding: 6px 0;">Company</td><td style="padding: 6px 0;">Single line text</td></tr>
-          <tr><td style="padding: 6px 0;">Location</td><td style="padding: 6px 0;">Single line text</td></tr>
-          <tr><td style="padding: 6px 0;">Salary Range</td><td style="padding: 6px 0;">Single line text</td></tr>
-          <tr><td style="padding: 6px 0;">Job Description</td><td style="padding: 6px 0;">Long text</td></tr>
-          <tr><td style="padding: 6px 0;">URL</td><td style="padding: 6px 0;">URL</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="help-section">
-      <h3>Setup Guide</h3>
-      <ol class="help-steps">
-        <li><span>Go to <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">airtable.com/create/tokens</a> and create a new token</span></li>
-        <li><span>Give it <strong>data.records:read</strong> and <strong>data.records:write</strong> scopes, and access to your base</span></li>
-        <li><span>Copy the Base ID from your Airtable base URL (starts with "app")</span></li>
-        <li><span>Enter your table name exactly as it appears in the tab</span></li>
-        <li><span>Click "Test Connection" to verify everything works</span></li>
-      </ol>
     </div>
   </div>
 

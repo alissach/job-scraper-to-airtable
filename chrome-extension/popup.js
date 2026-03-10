@@ -16,6 +16,7 @@ const elements = {
   descCharCount: document.getElementById("descCharCount"),
   url: document.getElementById("url"),
   saveBtn: document.getElementById("saveBtn"),
+  appsBtn: document.getElementById("appsBtn"),
   rescanBtn: document.getElementById("rescanBtn"),
   openSettings: document.getElementById("openSettings"),
   openSettingsFromConfig: document.getElementById("openSettingsFromConfig"),
@@ -776,40 +777,42 @@ function hideStatus() {
 }
 
 // Save to Airtable via background script
-async function saveToAirtable() {
+// target: "scraper" (Job Scraper table) or "apps" (Applications table)
+async function saveToAirtable(target = "scraper") {
   if (isSaving) return;
   isSaving = true;
 
-  const originalText = elements.saveBtn.textContent;
-  elements.saveBtn.textContent = "Saving...";
-  elements.saveBtn.disabled = true;
+  const btn = target === "apps" ? elements.appsBtn : elements.saveBtn;
+  const otherBtn = target === "apps" ? elements.saveBtn : elements.appsBtn;
+  const originalText = btn.textContent;
+  btn.textContent = "Saving...";
+  btn.disabled = true;
+  otherBtn.disabled = true;
   hideStatus();
-
-  const description = elements.description.value.trim();
 
   const data = {
     jobTitle: elements.jobTitle.value.trim(),
     company: elements.company.value.trim(),
     location: elements.location.value.trim(),
     salary: elements.salary.value.trim(),
-    description: description,
+    description: elements.description.value.trim(),
     url: elements.url.value.trim(),
   };
 
+  const action = target === "apps" ? "saveToApps" : "saveToAirtable";
+  const successMsg = target === "apps" ? "Added to Applications!" : "Saved for later!";
+
   try {
-    const response = await chrome.runtime.sendMessage({
-      action: "saveToAirtable",
-      data,
-    });
+    const response = await chrome.runtime.sendMessage({ action, data });
 
     if (response.success) {
-      showStatus("success", "Saved to Airtable!");
-      elements.saveBtn.textContent = "Saved";
+      showStatus("success", successMsg);
+      btn.textContent = "Saved";
 
-      // Reset button after 2 seconds
       setTimeout(() => {
-        elements.saveBtn.textContent = originalText;
-        elements.saveBtn.disabled = false;
+        btn.textContent = originalText;
+        btn.disabled = false;
+        otherBtn.disabled = false;
         isSaving = false;
       }, 2000);
     } else {
@@ -817,14 +820,16 @@ async function saveToAirtable() {
     }
   } catch (error) {
     showStatus("error", error.message || "Failed to save. Check your settings.");
-    elements.saveBtn.textContent = originalText;
-    elements.saveBtn.disabled = false;
+    btn.textContent = originalText;
+    btn.disabled = false;
+    otherBtn.disabled = false;
     isSaving = false;
   }
 }
 
 // Event listeners
-elements.saveBtn.addEventListener("click", saveToAirtable);
+elements.saveBtn.addEventListener("click", () => saveToAirtable("scraper"));
+elements.appsBtn.addEventListener("click", () => saveToAirtable("apps"));
 
 elements.rescanBtn.addEventListener("click", () => {
   hideStatus();

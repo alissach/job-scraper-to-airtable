@@ -4,6 +4,7 @@ const elements = {
   token: document.getElementById("token"),
   baseId: document.getElementById("baseId"),
   tableName: document.getElementById("tableName"),
+  appsTableName: document.getElementById("appsTableName"),
   saveBtn: document.getElementById("saveBtn"),
   testBtn: document.getElementById("testBtn"),
   status: document.getElementById("status"),
@@ -18,6 +19,7 @@ async function loadSettings() {
     "airtableToken",
     "airtableBaseId",
     "airtableTableName",
+    "airtableAppsTableName",
   ]);
 
   if (settings.airtableToken) {
@@ -29,6 +31,9 @@ async function loadSettings() {
   if (settings.airtableTableName) {
     elements.tableName.value = settings.airtableTableName;
   }
+  if (settings.airtableAppsTableName) {
+    elements.appsTableName.value = settings.airtableAppsTableName;
+  }
 }
 
 // Save settings
@@ -36,9 +41,10 @@ async function saveSettings() {
   const token = elements.token.value.trim();
   const baseId = elements.baseId.value.trim();
   const tableName = elements.tableName.value.trim();
+  const appsTableName = elements.appsTableName.value.trim();
 
   if (!token || !baseId || !tableName) {
-    showStatus("error", "All fields are required.");
+    showStatus("error", "Token, Base ID, and Job Scraper Table Name are required.");
     return;
   }
 
@@ -56,6 +62,7 @@ async function saveSettings() {
     airtableToken: token,
     airtableBaseId: baseId,
     airtableTableName: tableName,
+    airtableAppsTableName: appsTableName,
   });
 
   showStatus("success", "Settings saved.");
@@ -92,8 +99,8 @@ async function testConnection() {
       showStatus("error", "Invalid token. Check your Personal Access Token.");
     } else if (response.status === 403) {
       showStatus(
-        "error",
-        "Access denied. Make sure your token has access to this base and the data.records:write scope."
+        "success",
+        "Token is valid. If saving jobs works, you're all set."
       );
     } else if (response.status === 404) {
       showStatus(
