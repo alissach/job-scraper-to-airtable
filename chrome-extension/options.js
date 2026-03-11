@@ -3,7 +3,6 @@
 const elements = {
   token: document.getElementById("token"),
   baseId: document.getElementById("baseId"),
-  tableName: document.getElementById("tableName"),
   appsTableName: document.getElementById("appsTableName"),
   saveBtn: document.getElementById("saveBtn"),
   testBtn: document.getElementById("testBtn"),
@@ -18,7 +17,6 @@ async function loadSettings() {
   const settings = await chrome.storage.sync.get([
     "airtableToken",
     "airtableBaseId",
-    "airtableTableName",
     "airtableAppsTableName",
   ]);
 
@@ -27,9 +25,6 @@ async function loadSettings() {
   }
   if (settings.airtableBaseId) {
     elements.baseId.value = settings.airtableBaseId;
-  }
-  if (settings.airtableTableName) {
-    elements.tableName.value = settings.airtableTableName;
   }
   if (settings.airtableAppsTableName) {
     elements.appsTableName.value = settings.airtableAppsTableName;
@@ -40,11 +35,10 @@ async function loadSettings() {
 async function saveSettings() {
   const token = elements.token.value.trim();
   const baseId = elements.baseId.value.trim();
-  const tableName = elements.tableName.value.trim();
   const appsTableName = elements.appsTableName.value.trim();
 
-  if (!token || !baseId || !tableName) {
-    showStatus("error", "Token, Base ID, and Job Scraper Table Name are required.");
+  if (!token || !baseId || !appsTableName) {
+    showStatus("error", "Token, Base ID, and Table Name are required.");
     return;
   }
 
@@ -61,7 +55,6 @@ async function saveSettings() {
   await chrome.storage.sync.set({
     airtableToken: token,
     airtableBaseId: baseId,
-    airtableTableName: tableName,
     airtableAppsTableName: appsTableName,
   });
 
@@ -72,9 +65,9 @@ async function saveSettings() {
 async function testConnection() {
   const token = elements.token.value.trim();
   const baseId = elements.baseId.value.trim();
-  const tableName = elements.tableName.value.trim();
+  const appsTableName = elements.appsTableName.value.trim();
 
-  if (!token || !baseId || !tableName) {
+  if (!token || !baseId || !appsTableName) {
     showStatus("error", "Fill in all fields before testing.");
     return;
   }
@@ -84,7 +77,7 @@ async function testConnection() {
 
   try {
     // Try to list records (limit 1) to verify credentials and table access
-    const url = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}?maxRecords=1`;
+    const url = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(appsTableName)}?maxRecords=1`;
 
     const response = await fetch(url, {
       method: "GET",

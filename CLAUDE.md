@@ -28,11 +28,10 @@ Chrome Extension that scrapes job postings from various job boards and saves the
 - **Job descriptions saved as Markdown** for Airtable rich text fields
 
 ## Airtable Integration
-- Credentials stored in `chrome.storage.sync` (token, baseId, tableName, appsTableName)
+- Credentials stored in `chrome.storage.sync` (token, baseId, appsTableName)
 - PAT requires only `data.records:write` scope
-- Two save destinations, each with its own background function and message action:
-  - `saveToAirtable` → Job Scraper table: Job Title, Company, Location, Salary Range, Job Description, URL
-  - `saveToApps` → Applications table: Role or Job ID, Employer, Location (normalized via `mapLocation()`), Salary Range, Job Description, URL
+- One save destination: `saveToApps` → Applications table: Role or Job ID, Employer, Location (normalized via `mapLocation()`), Salary Range, Job Description, URL, Status
+- Status field is a Single Select; new records are always saved with `"Interested"` automatically
 - `mapLocation()` in background.js normalizes raw location text to readable labels: Remote, Seattle, NYC, Remote-first, Bellevue, or raw text as fallback
 - No hardcoded credentials
 
@@ -41,3 +40,9 @@ Chrome Extension that scrapes job postings from various job boards and saves the
 - Prefer path-based extraction over subdomain for job board company names
 - Greenhouse company is in the first path segment (not the subdomain)
 - Always update CLAUDE.md when project structure or conventions change
+
+## Accessibility
+- **Accessibility is a priority** — all UI changes must meet WCAG AA minimum
+- Link text color must have ≥4.5:1 contrast ratio against its background (dark surfaces need lighter blues — use `--link: #60a5fa`, not `--accent: #2563eb`)
+- `--accent` (#2563eb) is for button backgrounds (white text on blue passes), not for text on dark backgrounds
+- Always check contrast when adding new colors or UI elements
