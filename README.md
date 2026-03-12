@@ -4,6 +4,8 @@ A Chrome extension that extracts job posting data from any job board and saves i
 
 Note: this is still in development and may not work for all job postings. Feel free to create an issue and share the site URL for testing. 
 
+![Chrome extension overview](Chrome%20extension%20-%20Overview.png)
+
 ## Features
 
 - **One-click scraping** — Click the extension icon on any job posting to extract structured data
