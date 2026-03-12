@@ -47,8 +47,8 @@ async function saveToApps(jobData) {
       records: [
         {
           fields: {
-            "Role or Job ID": jobData.jobTitle || "",
-            "Employer": jobData.company || "",
+            "Job Title": jobData.jobTitle || "",
+            "Company": jobData.company || "",
             "Location": mapLocation(jobData.location),
             "Salary Range": jobData.salary || "",
             "Job Description": jobData.description || "",

@@ -57,8 +57,8 @@ Create one table in your Airtable base with these exact column names:
 
 | Column Name     | Field Type       | Notes                                                             |
 |-----------------|------------------|-------------------------------------------------------------------|
-| Role or Job ID  | Single line text |                                                                   |
-| Employer        | Single line text |                                                                   |
+| Job Title       | Single line text |                                                                   |
+| Company         | Single line text |                                                                   |
 | Location        | Single line text | Normalized to: Remote, Seattle, NYC, Remote-first, Bellevue, etc.|
 | Salary Range    | Single line text | e.g., "$120,000 - $160,000/yr"                                   |
 | Job Description | Long text        | Enable Markdown/rich text                                         |

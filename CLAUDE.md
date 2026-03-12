@@ -30,7 +30,7 @@ Chrome Extension that scrapes job postings from various job boards and saves the
 ## Airtable Integration
 - Credentials stored in `chrome.storage.sync` (token, baseId, appsTableName)
 - PAT requires only `data.records:write` scope
-- One save destination: `saveToApps` → Applications table: Role or Job ID, Employer, Location (normalized via `mapLocation()`), Salary Range, Job Description, URL, Status
+- One save destination: `saveToApps` → Applications table: Job Title, Company, Location (normalized via `mapLocation()`), Salary Range, Job Description, URL, Status
 - Status field is a Single Select; new records are always saved with `"Interested"` automatically
 - `mapLocation()` in background.js normalizes raw location text to readable labels: Remote, Seattle, NYC, Remote-first, Bellevue, or raw text as fallback
 - No hardcoded credentials
