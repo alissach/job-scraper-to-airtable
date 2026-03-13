@@ -226,9 +226,29 @@
     /* Buttons */
     .button-row {
       display: flex;
-      gap: 8px;
+      flex-direction: column;
+      gap: 0;
       padding: 12px 16px 16px;
       border-top: 1px solid var(--border);
+      position: sticky;
+      bottom: 0;
+      background: var(--bg);
+    }
+
+    .button-row::before {
+      content: '';
+      position: absolute;
+      top: -24px;
+      left: 0;
+      right: 0;
+      height: 24px;
+      background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.1));
+      pointer-events: none;
+    }
+
+    .button-row-actions {
+      display: flex;
+      gap: 8px;
     }
 
     .btn {
@@ -286,20 +306,48 @@
       cursor: not-allowed;
     }
 
+    @keyframes btnPop {
+      0%   { transform: scale(1); }
+      35%  { transform: scale(1.06); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes drawCheck {
+      from { stroke-dashoffset: 24; }
+      to   { stroke-dashoffset: 0; }
+    }
+
+    .btn-saved {
+      animation: btnPop 0.35s ease-out;
+    }
+
+    .btn-saved polyline {
+      stroke-dasharray: 24;
+      stroke-dashoffset: 24;
+      animation: drawCheck 0.3s ease-out 0.05s forwards;
+    }
+
     /* Status banner */
     .status-banner {
-      display: none;
+      display: flex;
       align-items: center;
       gap: 8px;
-      padding: 10px 14px;
-      margin: 0 16px 12px;
+      padding: 0 14px;
+      margin: 0;
       border-radius: var(--radius);
       font-size: 12px;
       font-weight: 500;
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      transition: max-height 0.25s ease-out, opacity 0.2s ease-out, padding 0.25s ease-out, margin 0.25s ease-out;
     }
 
     .status-banner.active {
-      display: flex;
+      max-height: 60px;
+      opacity: 1;
+      padding: 10px 14px;
+      margin: 10px 0 0;
     }
 
     .status-banner.success {
@@ -408,12 +456,6 @@
 
   <!-- Form state -->
   <div class="state" id="formState">
-    <!-- Status banner (success/error) -->
-    <div class="status-banner" id="statusBanner">
-      <svg id="statusIcon" viewBox="0 0 24 24" fill="currentColor"></svg>
-      <span class="status-text" id="statusText"></span>
-    </div>
-
     <div class="form-group">
       <div class="form-label">
         <label for="jobTitle">Job Title</label>
@@ -458,10 +500,16 @@
     </div>
   </div>
 
-  <!-- Action buttons -->
+  <!-- Action buttons + status -->
   <div class="button-row" id="buttonRow" style="display: none;">
-    <button class="btn btn-secondary" id="rescanBtn" style="flex: none; padding: 9px 12px;">Rescan</button>
-    <button class="btn btn-apps" id="appsBtn">Save to applications</button>
+    <div class="button-row-actions">
+      <button class="btn btn-secondary" id="rescanBtn" style="flex: none; padding: 9px 12px;">Rescan</button>
+      <button class="btn btn-apps" id="appsBtn">Save to applications</button>
+    </div>
+    <div class="status-banner" id="statusBanner">
+      <svg id="statusIcon" viewBox="0 0 24 24" fill="currentColor"></svg>
+      <span class="status-text" id="statusText"></span>
+    </div>
   </div>
 
   <script src="popup.js"></script>

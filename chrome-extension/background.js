@@ -31,7 +31,7 @@ async function saveToApps(jobData) {
   ]);
 
   if (!settings.airtableToken || !settings.airtableBaseId || !settings.airtableAppsTableName) {
-    throw new Error("Applications table not configured. Please set it in extension options.");
+    throw new Error("Airtable not configured. Open Settings to add your credentials.");
   }
 
   const { airtableToken, airtableBaseId, airtableAppsTableName } = settings;
@@ -62,11 +62,28 @@ async function saveToApps(jobData) {
 
   if (!response.ok) {
     const errorBody = await response.text();
-    let errorMessage = `Airtable API error (${response.status})`;
+    let errorMessage = `Airtable error (${response.status}). Check Settings.`;
     try {
       const parsed = JSON.parse(errorBody);
-      if (parsed.error && parsed.error.message) {
-        errorMessage = parsed.error.message;
+      const type = parsed.error?.type;
+      const msg = parsed.error?.message || "";
+
+      if (response.status === 401 || type === "AUTHENTICATION_REQUIRED") {
+        errorMessage = "Invalid API token. Check your token in Settings.";
+      } else if (type === "UNKNOWN_FIELD_NAME") {
+        const match = msg.match(/Unknown field name: "(.+?)"/);
+        const field = match ? `"${match[1]}"` : "a field";
+        errorMessage = `Field ${field} not found in Airtable. Field names are case-sensitive.`;
+      } else if (response.status === 403) {
+        errorMessage = "Permission denied. Ensure your token has data.records:write scope.";
+      } else if (response.status === 404) {
+        errorMessage = "Base or table not found. Check your Base ID and table name in Settings.";
+      } else if (response.status === 422) {
+        errorMessage = msg || "Invalid data — check your field names and types in Airtable.";
+      } else if (response.status === 429) {
+        errorMessage = "Rate limited. Wait a moment and try again.";
+      } else if (msg) {
+        errorMessage = msg;
       }
     } catch {
       // Use generic message

@@ -757,15 +757,11 @@ function updateCharCount() {
   }
 }
 
-// Show status banner
+// Show status — success changes the button, errors show a banner
 function showStatus(type, message) {
-  elements.statusBanner.className = `status-banner active ${type}`;
-  elements.statusText.textContent = message;
-
-  if (type === "success") {
-    elements.statusIcon.innerHTML =
-      '<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
-  } else {
+  if (type === "error") {
+    elements.statusBanner.className = `status-banner active ${type}`;
+    elements.statusText.textContent = message;
     elements.statusIcon.innerHTML =
       '<path d="M12 9v4m0 4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
   }
@@ -796,17 +792,18 @@ async function saveToAirtable() {
   };
 
   try {
-    const response = await chrome.runtime.sendMessage({ action: "saveToApps", data });
+    const [response] = await Promise.all([
+      chrome.runtime.sendMessage({ action: "saveToApps", data }),
+      new Promise((resolve) => setTimeout(resolve, 1000)),
+    ]);
 
     if (response.success) {
-      showStatus("success", "Added to Applications!");
-      btn.textContent = "Saved";
-
-      setTimeout(() => {
-        btn.textContent = originalText;
-        btn.disabled = false;
-        isSaving = false;
-      }, 2000);
+      hideStatus();
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 9 17 20 6"/></svg> Saved!`;
+      btn.classList.add("btn-saved");
+      btn.addEventListener("animationend", () => btn.classList.remove("btn-saved"), { once: true });
+      btn.disabled = false;
+      isSaving = false;
     } else {
       throw new Error(response.error || "Unknown error");
     }
@@ -823,6 +820,7 @@ elements.appsBtn.addEventListener("click", saveToAirtable);
 
 elements.rescanBtn.addEventListener("click", () => {
   hideStatus();
+  elements.appsBtn.textContent = "Save to applications";
   scrapeCurrentTab();
 });
 
