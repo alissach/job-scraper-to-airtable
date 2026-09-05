@@ -24,6 +24,7 @@ Chrome Extension that scrapes job postings from various job boards and saves the
 ## Scraping Conventions
 - **JSON-LD is primary** — schema.org JobPosting structured data is most reliable
 - **Domain-based company detection** — Extract company from URL patterns (greenhouse.io, lever.co, ashbyhq.com), not hardcoded name checks
+- **LinkedIn is a special case** — LinkedIn job pages don't reliably expose JSON-LD, so title/company/location/description each have dedicated `linkedin.com` branches (checked first). LinkedIn has two DOM generations: legacy classed DOM (`.job-details-jobs-unified-top-card__job-title`, `.topcard__org-name-link`) and a newer "SDUI" redesign with hashed, per-deploy CSS classes that must NOT be selected on directly — use its stable semantic hooks instead (`[id^="JobDetails_AboutTheJob_"]`, `[data-sdui-component*="aboutTheJob"]` for description; `document.title` "{Company} hiring {Job Title}..." pattern for company)
 - **Boilerplate removal** — Strip "How to Apply", "About Company", EEO sections from descriptions
 - **Job descriptions saved as Markdown** for Airtable rich text fields
 

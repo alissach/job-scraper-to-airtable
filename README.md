@@ -82,7 +82,7 @@ Each field uses a layered extraction strategy:
 
 **Job Title** — `og:title` meta tag → job-title CSS classes → first `<h1>` → document title
 
-**Company** — ATS URL patterns (Greenhouse, Lever, Ashby) → `og:site_name` → "at Company" in page title → domain name
+**Company** — ATS URL patterns (Greenhouse, Lever, Ashby) → LinkedIn top-card selectors → `og:site_name` → "at Company" in page title → domain name
 
 **Location** — Meta description patterns → labeled fields ("Location:", "Based in:") → US state abbreviation validation → workplace type detection (Remote/Hybrid/On-site) → emoji indicators
 

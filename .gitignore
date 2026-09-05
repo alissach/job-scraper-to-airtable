@@ -1,4 +1,5 @@
 .DS_Store
+DEVLOG.md
 .env*.local
 .vscode/
 tmpclaude-*

@@ -371,6 +371,20 @@ async function scrapeCurrentTab() {
 
         // ── Fallback: Job title extraction ──
         function extractJobTitle(companyName) {
+          // 0. LinkedIn-specific selectors (og:title on LinkedIn is "X hiring Y" and unreliable)
+          if (window.location.hostname.includes("linkedin.com")) {
+            const liSelectors = [
+              '.job-details-jobs-unified-top-card__job-title h1',
+              '.job-details-jobs-unified-top-card__job-title',
+              '.jobs-unified-top-card__job-title',
+              '.top-card-layout__title',
+            ];
+            for (const sel of liSelectors) {
+              const el = document.querySelector(sel);
+              if (el && el.textContent.trim().length > 2) return el.textContent.trim();
+            }
+          }
+
           // 1. og:title (often more accurate than h1 on job boards)
           const ogTitle = document.querySelector('meta[property="og:title"]');
           if (ogTitle && ogTitle.content) {
@@ -404,8 +418,10 @@ async function scrapeCurrentTab() {
           }
 
           // 4. document.title fallback
+          // Split only on "|", en/em dash, or a hyphen with whitespace on both sides ("Title - Company") \u2014
+          // a bare hyphen with no surrounding whitespace is part of a word (e.g. "E-commerce") and must not split.
           const title = document.title || '';
-          return title.split(/\s*[|\-\u2013\u2014]\s*/)[0].replace(/\s+at\s+.+$/i, '').trim();
+          return title.split(/\s*[|\u2013\u2014]\s*|\s+-\s+/)[0].replace(/\s+at\s+.+$/i, '').trim();
         }
 
         // ── Fallback: Company extraction ──
@@ -423,23 +439,59 @@ async function scrapeCurrentTab() {
             const parts = window.location.pathname.split("/").filter(Boolean);
             if (parts.length > 0) return formatCompanyName(parts[0]);
           }
+          if (hostname.includes("linkedin.com")) {
+            // LinkedIn's redesigned job pages ("SDUI") use hashed, per-deploy CSS class names
+            // (e.g. "e5667a85 eb9b01fe _1b608c33") that aren't safe to select on. The stable
+            // hooks are the semantic ids/data attributes LinkedIn keeps across postings, e.g.
+            // id="JobDetails_AboutTheJob_<postingId>" — match by prefix so this works for any
+            // job id, not just one posting.
+            const liSelectors = [
+              '.job-details-jobs-unified-top-card__company-name a',
+              '.job-details-jobs-unified-top-card__company-name',
+              '.jobs-unified-top-card__company-name',
+              '.topcard__org-name-link',
+            ];
+            for (const sel of liSelectors) {
+              const el = document.querySelector(sel);
+              if (el && el.textContent.trim().length > 0) return el.textContent.trim();
+            }
+            // SDUI pages keep an accessible aria-label ("Company, Design Citizen.") on the
+            // wrapper around the company link — stable regardless of the hashed classes on
+            // the element itself, and doesn't depend on any per-posting id.
+            const companyAriaEl = document.querySelector('[aria-label^="Company,"]');
+            if (companyAriaEl) {
+              const m = (companyAriaEl.getAttribute('aria-label') || '').match(/^Company,\s*(.+?)\.?$/i);
+              if (m && m[1].trim().length > 0) return m[1].trim();
+            }
+            // Fallback: the first link to a LinkedIn company profile page on the job posting
+            // (the top card's company link is always the first one to appear in the DOM).
+            const companyLink = document.querySelector('a[href*="linkedin.com/company/"]');
+            if (companyLink && companyLink.textContent.trim().length > 0) return companyLink.textContent.trim();
+            // LinkedIn's <title> follows "{Company} hiring {Job Title} in {Location} | LinkedIn"
+            // on public job postings — more reliable than hashed classes for the new DOM.
+            const hiringMatch = (document.title || '').match(/^(.+?)\s+hiring\s+/i);
+            if (hiringMatch && hiringMatch[1].trim().length > 0) return hiringMatch[1].trim();
+          }
           const ogSiteName = document.querySelector('meta[property="og:site_name"]');
           if (ogSiteName && ogSiteName.content) {
             const siteName = ogSiteName.content.trim();
             // Skip if it looks like UI text, not a company name
-            if (!/^(all\s+openings|careers|jobs|positions|apply\s+now|work\s+with\s+us)/i.test(siteName)) {
+            if (!/^(all\s+openings|careers|jobs|positions|apply\s+now|work\s+with\s+us|linkedin|indeed|glassdoor)/i.test(siteName)) {
               return siteName;
             }
           }
           const title = document.title || "";
-          const atMatch = title.match(/\bat\s+(.+?)(?:\s*[|\-\u2013\u2014]|$)/i);
+          // Same delimiter rule as the title fallback: a bare hyphen only counts as a separator
+          // with whitespace on both sides, so a hyphenated word (e.g. "E-commerce") in the job
+          // title isn't split apart.
+          const atMatch = title.match(/\bat\s+(.+?)(?:\s*[|\u2013\u2014]|\s+-\s+|$)/i);
           if (atMatch) return atMatch[1].trim();
-          const titleParts = title.split(/\s*[|\-\u2013\u2014]\s*/);
+          const titleParts = title.split(/\s*[|\u2013\u2014]\s*|\s+-\s+/);
           if (titleParts.length >= 2) {
             const lastPart = titleParts[titleParts.length - 1].trim();
             // Only use if it looks like a company name (not UI text)
             if (lastPart.length >= 2 && lastPart.length <= 60 &&
-                !/^(all\s+openings|apply\s+now|careers|jobs|positions)/i.test(lastPart)) {
+                !/^(all\s+openings|apply\s+now|careers|jobs|positions|linkedin|indeed|glassdoor)$/i.test(lastPart)) {
               return lastPart;
             }
           }
@@ -462,6 +514,17 @@ async function scrapeCurrentTab() {
 
         // ── Fallback: Location extraction ──
         function extractLocation() {
+          // 0. LinkedIn-specific: primary description container is "Location · time · applicants"
+          if (window.location.hostname.includes("linkedin.com")) {
+            const bullet = document.querySelector('.topcard__flavor--bullet');
+            if (bullet && bullet.textContent.trim().length > 1) return bullet.textContent.trim();
+            const primary = document.querySelector('.job-details-jobs-unified-top-card__primary-description-container');
+            if (primary) {
+              const first = (primary.textContent || '').split('·')[0].trim();
+              if (first.length > 1 && first.length < 100) return first;
+            }
+          }
+
           // 1. Platform-specific DOM selectors
           const locationSelectors = [
             '[data-qa="job-location"]',
@@ -561,14 +624,20 @@ async function scrapeCurrentTab() {
             '[class*="job-header"], [class*="jobHeader"], [class*="salary"], [class*="compensation"], ' +
             '[class*="pay-range"], [class*="payRange"], [data-testid*="salary"]'
           );
+          // Unit suffix, optional on EITHER side of the range separator \u2014 handles both
+          // "$120,000 - $160,000 /yr" (unit trails the range) and "$100/hr - $115/hr"
+          // (unit trails each number, e.g. LinkedIn's insight pills).
+          const unit = '\\s*(?:\\/\\s*(?:yr|year|mo|month|hr|hour)|per\\s+(?:year|annum|month|hour)|annually)?';
+          const fullRangeRe = new RegExp('\\$[\\d,]+(?:\\.\\d{2})?[Kk]?' + unit + '\\s*[-\\u2013\\u2014to]+\\s*\\$[\\d,]+(?:\\.\\d{2})?[Kk]?' + unit, 'i');
+
           if (headerArea) {
             const ht = headerArea.innerText || '';
-            const m = ht.match(/\$[\d,]+(?:\.\d{2})?[Kk]?\s*[-\u2013\u2014to]+\s*\$[\d,]+(?:\.\d{2})?[Kk]?(?:\s*(?:per\s+(?:year|annum|month|hour)|\/\s*(?:yr|year|mo|month|hr|hour)|annually))?/i);
+            const m = ht.match(fullRangeRe);
             if (m) return m[0].trim();
           }
 
-          // 2. $ range: "$120,000 - $160,000 /yr" or "$120K - $160K"
-          const fullRange = bodyText.match(/\$[\d,]+(?:\.\d{2})?[Kk]?\s*[-\u2013\u2014to]+\s*\$[\d,]+(?:\.\d{2})?[Kk]?(?:\s*(?:per\s+(?:year|annum|month|hour)|\/\s*(?:yr|year|mo|month|hr|hour)|a\s+year|annually|USD))?/i);
+          // 2. $ range: "$120,000 - $160,000 /yr", "$120K - $160K", or "$100/hr - $115/hr"
+          const fullRange = bodyText.match(fullRangeRe);
           if (fullRange) return fullRange[0].trim();
 
           // 3. Labeled salary with number range (no $ required): "Salary: 120,000 - 160,000"
@@ -659,6 +728,11 @@ async function scrapeCurrentTab() {
             clone = tempDiv;
           } else {
             const contentSelectors = [
+              // LinkedIn's redesigned "SDUI" job pages use hashed per-deploy CSS classes, but keep
+              // stable semantic ids/data attributes for the "About the job" section — match by
+              // prefix/substring so this works across postings (the id embeds the posting's job id).
+              '[data-sdui-component*="aboutTheJob"]', '[id^="JobDetails_AboutTheJob_"]', '[componentkey^="JobDetails_AboutTheJob_"]',
+              '#job-details', '.jobs-description__content', '.jobs-box__html-content', '.description__text',
               '[class*="job-description"]', '[class*="jobDescription"]', '[class*="job_description"]',
               '[id*="job-description"]', '[id*="jobDescription"]',
               '.posting-page', '.content-wrapper .posting', '[data-qa="job-description"]',
