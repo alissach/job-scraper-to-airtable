@@ -1,0 +1,12 @@
+{
+  "name": "job-scraper-devtools-screenshot",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Dev-only tool: screenshots the extension popup for DEVLOG.md. Not part of the shipped extension.",
+  "scripts": {
+    "capture": "node capture.js"
+  },
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

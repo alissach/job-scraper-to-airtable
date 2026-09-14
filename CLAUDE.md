@@ -7,7 +7,7 @@ Chrome Extension that scrapes job postings from various job boards and saves the
 - **Chrome Extension:** Vanilla JavaScript, Manifest v3
 
 ## Key Files
-- `chrome-extension/popup.js` — Main popup UI & scraping orchestration
+- `chrome-extension/popup.js` — Main popup UI & scraping orchestration. Also handles opening `popup.html?standalone=1&tabId=<id>` as its own `chrome.windows.create` popup-type window (via the header's "open in window" button) so the UI can stay open past the toolbar popup's auto-close-on-blur behavior; `?standalone=1` removes the ~600px action-popup height cap via a `body.standalone` CSS class. The `tabId` param is required — in a standalone window, `chrome.tabs.query({currentWindow:true})` would resolve to the extension's own popup.html tab (not the job posting tab), which the extension has no host permission to script, throwing "Cannot access contents of the page." The job-posting tab's id is captured up front (while `activeTab`'s grant is still live from the original toolbar-popup invocation) and threaded through the URL so the standalone window scripts the right tab. Any in-progress edits in the popup are also carried over: clicking "open in window" stashes the current form state (`getFormData()`) in `chrome.storage.session` under `popupDraft`; the standalone window's `init()` picks it up (and clears it) instead of re-scraping, via `applyFormData()`.
 - `chrome-extension/content.js` — DOM scraping (injected into active tab)
 - `chrome-extension/background.js` — Service worker, handles Airtable API calls
 - `chrome-extension/options.js` — Settings page for Airtable credentials
@@ -31,8 +31,9 @@ Chrome Extension that scrapes job postings from various job boards and saves the
 ## Airtable Integration
 - Credentials stored in `chrome.storage.sync` (token, baseId, appsTableName)
 - PAT requires only `data.records:write` scope
-- One save destination: `saveToApps` → Applications table: Job Title, Company, Location (normalized via `mapLocation()`), Salary Range, Job Description, URL, Status
-- Status field is a Single Select; new records are always saved with `"Interested"` automatically
+- One save destination: `saveToApps` → Applications table: Job Title, Company, Location (normalized via `mapLocation()`), Salary Range, Job Description, URL, Status, Date Applied
+- Status field is a Single Select, editable in the popup (options: Interested, Applied); defaults to `"Interested"` on each scrape
+- Date Applied is optional and left blank by default; `background.js` omits the field entirely when blank since Airtable date fields reject `""`
 - `mapLocation()` in background.js normalizes raw location text to readable labels: Remote, Seattle, NYC, Remote-first, Bellevue, or raw text as fallback
 - No hardcoded credentials
 

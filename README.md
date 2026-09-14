@@ -21,8 +21,8 @@ Note: this is still in development and may not work for all job postings. Feel f
 1. Navigate to a full-page job posting on any supported site
 2. Click the extension icon in your toolbar
 3. The extension scrapes the page — first checking for JSON-LD structured data (`schema.org/JobPosting`), then falling back to platform-specific DOM selectors and heuristic scoring
-4. Review the extracted fields (Job Title, Company, Location, Salary Range, Description, URL)
-5. Click **Save to applications** to log it to your Applications table — Status is automatically set to "Interested"
+4. Review the extracted fields (Job Title, Company, Location, Salary Range, Description, URL, Status, Date Applied)
+5. Click **Save to applications** to log it to your Applications table — Status defaults to "Interested" and Date Applied is left blank unless you set it
 
 ## Installation
 
@@ -65,7 +65,8 @@ Create one table in your Airtable base with these exact column names:
 | Salary Range    | Single line text | e.g., "$120,000 - $160,000/yr"                                   |
 | Job Description | Long text        | Enable Markdown/rich text                                         |
 | URL             | URL              | Link to the original posting                                      |
-| Status          | Single select    | Add "Interested" as an option — set automatically on save        |
+| Status          | Single select    | Add "Interested" and "Applied" as options — defaults to "Interested" on save|
+| Date Applied    | Date             | Optional — left blank unless you set it in the popup             |
 
 > Column names are **case-sensitive** — they must match exactly as shown above.
 

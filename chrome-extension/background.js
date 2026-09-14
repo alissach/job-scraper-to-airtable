@@ -37,6 +37,22 @@ async function saveToApps(jobData) {
   const { airtableToken, airtableBaseId, airtableAppsTableName } = settings;
   const url = `https://api.airtable.com/v0/${airtableBaseId}/${encodeURIComponent(airtableAppsTableName)}`;
 
+  const fields = {
+    "Job Title": jobData.jobTitle || "",
+    "Company": jobData.company || "",
+    "Location": mapLocation(jobData.location),
+    "Salary Range": jobData.salary || "",
+    "Job Description": jobData.description || "",
+    "URL": jobData.url || "",
+    "Status": jobData.status || "Interested",
+  };
+
+  // Date Applied is optional — omit it entirely rather than sending an empty string,
+  // since Airtable date fields reject "".
+  if (jobData.dateApplied) {
+    fields["Date Applied"] = jobData.dateApplied;
+  }
+
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -46,15 +62,7 @@ async function saveToApps(jobData) {
     body: JSON.stringify({
       records: [
         {
-          fields: {
-            "Job Title": jobData.jobTitle || "",
-            "Company": jobData.company || "",
-            "Location": mapLocation(jobData.location),
-            "Salary Range": jobData.salary || "",
-            "Job Description": jobData.description || "",
-            "URL": jobData.url || "",
-            "Status": "Interested",
-          },
+          fields,
         },
       ],
     }),

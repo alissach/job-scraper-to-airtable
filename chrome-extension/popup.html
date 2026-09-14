@@ -31,15 +31,39 @@
     }
 
     body {
+      color-scheme: dark;
       width: 380px;
       min-height: 200px;
-      max-height: 580px;
+      max-height: 600px;
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
       font-size: 13px;
       line-height: 1.5;
       overflow-y: auto;
+    }
+
+    body.standalone {
+      width: 100%;
+      height: 100vh;
+      min-height: 100vh;
+      max-height: none;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Scrollable content area above the pinned footer — only the fields
+       scroll; the header and button row stay put. */
+    body.standalone .scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    body.standalone .button-row {
+      flex-shrink: 0;
+      margin-top: 0;
     }
 
     /* Header */
@@ -55,6 +79,45 @@
       display: flex;
       align-items: center;
       gap: 8px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      padding: 5px 6px !important;
+      position: relative;
+    }
+
+    .icon-btn::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: var(--surface-hover);
+      color: var(--text);
+      border: 1px solid var(--border-focus);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-2px);
+      transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .icon-btn:hover::after,
+    .icon-btn:focus-visible::after {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
     }
 
     .header-icon {
@@ -150,6 +213,24 @@
       margin-bottom: 0;
     }
 
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .form-row .form-group {
+      margin-bottom: 0;
+    }
+
+    .form-group-nested {
+      margin-top: 10px;
+      margin-left: 14px;
+      padding-left: 10px;
+      border-left: 2px solid var(--border);
+    }
+
     .form-label {
       display: flex;
       align-items: center;
@@ -171,6 +252,8 @@
     }
 
     input[type="text"],
+    input[type="date"],
+    select,
     textarea {
       width: 100%;
       background: #27272a;
@@ -186,6 +269,8 @@
     }
 
     input[type="text"]:focus,
+    input[type="date"]:focus,
+    select:focus,
     textarea:focus {
       border-color: var(--accent);
       outline: 2px solid var(--accent);
@@ -213,6 +298,11 @@
       min-height: 80px;
       max-height: 140px;
       font-size: 12px;
+    }
+
+    body.standalone textarea.description-field {
+      max-height: none;
+      min-height: 93px;
     }
 
     .url-field {
@@ -432,12 +522,17 @@
       </div>
       <h1>Job Scraper</h1>
     </div>
-    <button class="settings-btn" id="openSettings">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-      Settings
-    </button>
+    <div class="header-actions">
+      <button class="settings-btn icon-btn" id="openWindow" data-tooltip="Open in separate window" aria-label="Open in separate window">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      </button>
+      <button class="settings-btn icon-btn" id="openSettings" data-tooltip="Settings" aria-label="Settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+      </button>
+    </div>
   </div>
 
+  <div class="scroll-area">
   <!-- No config state -->
   <div class="no-config" id="noConfigState">
     <div class="no-config-icon">
@@ -463,18 +558,20 @@
       <input type="text" id="jobTitle" placeholder="e.g. Senior UX Designer" />
     </div>
 
-    <div class="form-group">
-      <div class="form-label">
-        <label for="company">Company</label>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">
+          <label for="company">Company</label>
+        </div>
+        <input type="text" id="company" placeholder="e.g. Omnidian" />
       </div>
-      <input type="text" id="company" placeholder="e.g. Omnidian" />
-    </div>
 
-    <div class="form-group">
-      <div class="form-label">
-        <label for="location">Location</label>
+      <div class="form-group">
+        <div class="form-label">
+          <label for="location">Location</label>
+        </div>
+        <input type="text" id="location" placeholder="e.g. Seattle, Hybrid" />
       </div>
-      <input type="text" id="location" placeholder="e.g. Seattle, Hybrid" />
     </div>
 
     <div class="form-group">
@@ -494,10 +591,29 @@
 
     <div class="form-group">
       <div class="form-label">
+        <label for="status">Status</label>
+      </div>
+      <select id="status">
+        <option value="Interested">Interested</option>
+        <option value="Applied">Applied</option>
+      </select>
+
+      <div class="form-group form-group-nested" id="dateAppliedGroup" hidden>
+        <div class="form-label">
+          <label for="dateApplied">Date Applied</label>
+          <span class="char-count">Optional</span>
+        </div>
+        <input type="date" id="dateApplied" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
         <label for="url">URL</label>
       </div>
       <input type="text" id="url" class="url-field" readonly />
     </div>
+  </div>
   </div>
 
   <!-- Action buttons + status -->

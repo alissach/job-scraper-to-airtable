@@ -14,15 +14,26 @@ const elements = {
   salary: document.getElementById("salary"),
   description: document.getElementById("description"),
   descCharCount: document.getElementById("descCharCount"),
+  status: document.getElementById("status"),
+  dateAppliedGroup: document.getElementById("dateAppliedGroup"),
+  dateApplied: document.getElementById("dateApplied"),
   url: document.getElementById("url"),
   appsBtn: document.getElementById("appsBtn"),
   rescanBtn: document.getElementById("rescanBtn"),
+  openWindow: document.getElementById("openWindow"),
   openSettings: document.getElementById("openSettings"),
   openSettingsFromConfig: document.getElementById("openSettingsFromConfig"),
 };
 
 // State
 let isSaving = false;
+
+// When opened standalone (its own window rather than the toolbar popup), the
+// job posting tab isn't "the active tab in the current window" anymore — this
+// window only contains the extension's own page. The tab to scrape is instead
+// passed in via ?tabId=, captured before the window was opened.
+const standaloneTabId = new URLSearchParams(location.search).get("tabId");
+let currentTabId = standaloneTabId ? Number(standaloneTabId) : null;
 
 // Initialize popup
 async function init() {
@@ -42,6 +53,18 @@ async function init() {
     return;
   }
 
+  // If this window was opened via "Open in separate window", carry over
+  // whatever the user had already typed in the popup instead of re-scraping.
+  if (standaloneTabId) {
+    const { popupDraft } = await chrome.storage.session.get("popupDraft");
+    if (popupDraft) {
+      await chrome.storage.session.remove("popupDraft");
+      applyFormData(popupDraft);
+      showState("form");
+      return;
+    }
+  }
+
   await scrapeCurrentTab();
 }
 
@@ -59,16 +82,21 @@ async function scrapeCurrentTab() {
   hideStatus();
 
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    let tabId = currentTabId;
 
-    if (!tab || !tab.id) {
-      throw new Error("No active tab found.");
+    if (!tabId) {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab || !tab.id) {
+        throw new Error("No active tab found.");
+      }
+      tabId = tab.id;
+      currentTabId = tab.id;
     }
 
     // Inject and execute the content script in one call using func:
     // This avoids isolated world issues with files: + func: two-step approach
     const results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
+      target: { tabId },
       func: () => {
         // ── Utility: format URL slug to title case ──
         function formatCompanyName(slug) {
@@ -816,9 +844,52 @@ function populateForm(data) {
   
   // Description is a Markdown string
   elements.description.value = data.description || "";
-  
+
+  elements.status.value = "Interested";
+  elements.dateApplied.value = "";
+  updateDateAppliedVisibility();
+
   elements.url.value = data.url || "";
   updateCharCount();
+}
+
+// Read the current form values (also used to carry a draft over to the
+// standalone window and to build the save payload)
+function getFormData() {
+  return {
+    jobTitle: elements.jobTitle.value.trim(),
+    company: elements.company.value.trim(),
+    location: elements.location.value.trim(),
+    salary: elements.salary.value.trim(),
+    description: elements.description.value.trim(),
+    status: elements.status.value,
+    dateApplied: elements.dateApplied.value,
+    url: elements.url.value.trim(),
+  };
+}
+
+// Restore a previously-edited draft as-is (unlike populateForm, does not
+// reset Status/Date Applied to their scrape defaults)
+function applyFormData(data) {
+  elements.jobTitle.value = data.jobTitle || "";
+  elements.company.value = data.company || "";
+  elements.location.value = data.location || "";
+  elements.salary.value = data.salary || "";
+  elements.description.value = data.description || "";
+  elements.status.value = data.status || "Interested";
+  elements.dateApplied.value = data.dateApplied || "";
+  elements.url.value = data.url || "";
+  updateDateAppliedVisibility();
+  updateCharCount();
+}
+
+// Date Applied only makes sense once the user marks the job as Applied
+function updateDateAppliedVisibility() {
+  const isApplied = elements.status.value === "Applied";
+  elements.dateAppliedGroup.hidden = !isApplied;
+  if (!isApplied) {
+    elements.dateApplied.value = "";
+  }
 }
 
 // Update description character count
@@ -856,14 +927,7 @@ async function saveToAirtable() {
   btn.disabled = true;
   hideStatus();
 
-  const data = {
-    jobTitle: elements.jobTitle.value.trim(),
-    company: elements.company.value.trim(),
-    location: elements.location.value.trim(),
-    salary: elements.salary.value.trim(),
-    description: elements.description.value.trim(),
-    url: elements.url.value.trim(),
-  };
+  const data = getFormData();
 
   try {
     const [response] = await Promise.all([
@@ -898,6 +962,31 @@ elements.rescanBtn.addEventListener("click", () => {
   scrapeCurrentTab();
 });
 
+elements.openWindow.addEventListener("click", async () => {
+  const tabIdParam = currentTabId ? `&tabId=${currentTabId}` : "";
+
+  // Carry over whatever is currently in the form (edited or not) so the
+  // standalone window doesn't discard it by re-scraping from scratch.
+  if (elements.formState.classList.contains("active")) {
+    await chrome.storage.session.set({ popupDraft: getFormData() });
+  }
+
+  chrome.windows.create({
+    url: chrome.runtime.getURL(`popup.html?standalone=1${tabIdParam}`),
+    type: "popup",
+    width: 420,
+    height: 720,
+  });
+  window.close();
+});
+
+// Opened as its own window rather than the toolbar popup — not subject to
+// Chrome's ~600px action-popup height cap, so let it use the full window.
+if (new URLSearchParams(location.search).get("standalone") === "1") {
+  document.body.classList.add("standalone");
+  elements.openWindow.style.display = "none";
+}
+
 elements.openSettings.addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
@@ -907,6 +996,7 @@ elements.openSettingsFromConfig.addEventListener("click", () => {
 });
 
 elements.description.addEventListener("input", updateCharCount);
+elements.status.addEventListener("change", updateDateAppliedVisibility);
 
 // Start
 init();
