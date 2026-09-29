@@ -31,9 +31,10 @@ Chrome Extension that scrapes job postings from various job boards and saves the
 ## Airtable Integration
 - Credentials stored in `chrome.storage.sync` (token, baseId, appsTableName)
 - PAT requires only `data.records:write` scope
-- One save destination: `saveToApps` → Applications table: Job Title, Company, Location (normalized via `mapLocation()`), Salary Range, Job Description, URL, Status, Date Applied
+- One save destination: `saveToApps` → Applications table: Job Title, Company, Location (normalized via `mapLocation()`), RTO, Salary Range, Job Description, URL, Status, Date Applied
 - Status field is a Single Select, editable in the popup (options: Interested, Applied); defaults to `"Interested"` on each scrape
-- Date Applied is optional and left blank by default; `background.js` omits the field entirely when blank since Airtable date fields reject `""`
+- Date Applied is optional; it auto-fills with today's local date when Status is changed to Applied (only on a real `change` event, so restoring a standalone-window draft with a cleared date doesn't re-add it). `background.js` omits the field entirely when blank since Airtable date fields reject `""`
+- RTO is an optional Single Select (On-site, Hybrid, Remote) shown to the left of Salary Range; blank by default and omitted from the record when blank. **The Hybrid choice is literally named `"Hybrid "` with a trailing space in Airtable** — the `<option value>` must keep it or Airtable rejects the write
 - `mapLocation()` in background.js normalizes raw location text to readable labels: Remote, Seattle, NYC, Remote-first, Bellevue, or raw text as fallback
 - No hardcoded credentials
 
