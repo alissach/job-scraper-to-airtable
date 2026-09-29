@@ -574,11 +574,27 @@
       </div>
     </div>
 
-    <div class="form-group">
-      <div class="form-label">
-        <label for="salary">Salary Range</label>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">
+          <label for="rto">RTO</label>
+          <span class="char-count">Optional</span>
+        </div>
+        <select id="rto">
+          <option value="">—</option>
+          <option value="On-site">On-site</option>
+          <!-- value must match the Airtable choice exactly, trailing space included -->
+          <option value="Hybrid ">Hybrid</option>
+          <option value="Remote">Remote</option>
+        </select>
       </div>
-      <input type="text" id="salary" placeholder="e.g. $110,500 - $149,500 a year" />
+
+      <div class="form-group">
+        <div class="form-label">
+          <label for="salary">Salary Range</label>
+        </div>
+        <input type="text" id="salary" placeholder="e.g. $110,500 - $149,500 a year" />
+      </div>
     </div>
 
     <div class="form-group">

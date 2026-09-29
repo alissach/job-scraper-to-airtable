@@ -47,6 +47,12 @@ async function saveToApps(jobData) {
     "Status": jobData.status || "Interested",
   };
 
+  // RTO is an optional single select — omit it when blank so Airtable doesn't
+  // reject "" as an invalid choice.
+  if (jobData.rto) {
+    fields["RTO"] = jobData.rto;
+  }
+
   // Date Applied is optional — omit it entirely rather than sending an empty string,
   // since Airtable date fields reject "".
   if (jobData.dateApplied) {

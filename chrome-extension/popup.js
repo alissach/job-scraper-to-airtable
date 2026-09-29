@@ -11,6 +11,7 @@ const elements = {
   jobTitle: document.getElementById("jobTitle"),
   company: document.getElementById("company"),
   location: document.getElementById("location"),
+  rto: document.getElementById("rto"),
   salary: document.getElementById("salary"),
   description: document.getElementById("description"),
   descCharCount: document.getElementById("descCharCount"),
@@ -840,6 +841,7 @@ function populateForm(data) {
   elements.jobTitle.value = data.jobTitle || "";
   elements.company.value = data.company || "";
   elements.location.value = data.location || "";
+  elements.rto.value = "";
   elements.salary.value = data.salary || "";
   
   // Description is a Markdown string
@@ -860,6 +862,7 @@ function getFormData() {
     jobTitle: elements.jobTitle.value.trim(),
     company: elements.company.value.trim(),
     location: elements.location.value.trim(),
+    rto: elements.rto.value,
     salary: elements.salary.value.trim(),
     description: elements.description.value.trim(),
     status: elements.status.value,
@@ -874,6 +877,7 @@ function applyFormData(data) {
   elements.jobTitle.value = data.jobTitle || "";
   elements.company.value = data.company || "";
   elements.location.value = data.location || "";
+  elements.rto.value = data.rto || "";
   elements.salary.value = data.salary || "";
   elements.description.value = data.description || "";
   elements.status.value = data.status || "Interested";
@@ -883,12 +887,24 @@ function applyFormData(data) {
   updateCharCount();
 }
 
-// Date Applied only makes sense once the user marks the job as Applied
-function updateDateAppliedVisibility() {
+// Today in the user's local timezone, as the yyyy-mm-dd an <input type="date">
+// expects (toISOString() would be UTC and can land on the wrong day)
+function todayLocalISO() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+// Date Applied only makes sense once the user marks the job as Applied.
+// Switching to Applied defaults the date to today (still editable); autofill is
+// skipped when restoring saved form state so a deliberately-cleared date sticks.
+function updateDateAppliedVisibility({ autofill = false } = {}) {
   const isApplied = elements.status.value === "Applied";
   elements.dateAppliedGroup.hidden = !isApplied;
   if (!isApplied) {
     elements.dateApplied.value = "";
+  } else if (autofill && !elements.dateApplied.value) {
+    elements.dateApplied.value = todayLocalISO();
   }
 }
 
@@ -996,7 +1012,9 @@ elements.openSettingsFromConfig.addEventListener("click", () => {
 });
 
 elements.description.addEventListener("input", updateCharCount);
-elements.status.addEventListener("change", updateDateAppliedVisibility);
+elements.status.addEventListener("change", () =>
+  updateDateAppliedVisibility({ autofill: true })
+);
 
 // Start
 init();

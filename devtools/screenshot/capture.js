@@ -9,6 +9,7 @@
 //   --view=popup|standalone   which surface to screenshot (default: popup)
 //   --status=Interested|Applied
 //   --dateApplied=YYYY-MM-DD  only shown/sent when --status=Applied
+//   --rto=On-site|Hybrid |Remote   (blank by default)
 //   --jobTitle, --company, --location, --salary, --description, --url
 //     override the sample job data used to fill the form
 //   --width, --height         viewport size (defaults: popup 400x640, standalone 420x720)
@@ -24,6 +25,7 @@ const SAMPLE = {
   jobTitle: "Senior Product Designer",
   company: "Airtable",
   location: "Remote-first",
+  rto: "",
   salary: "$160,000 - $215,000 /yr",
   description:
     "## About the role\n\nWe're looking for a Senior Product Designer to join our growing design team...\n\n## What you'll do\n\n- Own end-to-end design for core workflows\n- Partner closely with PM and engineering\n- Mentor other designers on the team\n\n## What we're looking for\n\n- 5+ years of product design experience\n- A strong portfolio of shipped work\n- Excellent communication skills",
@@ -44,6 +46,7 @@ async function fillForm(page, data) {
     document.getElementById("jobTitle").value = data.jobTitle;
     document.getElementById("company").value = data.company;
     document.getElementById("location").value = data.location;
+    document.getElementById("rto").value = data.rto;
     document.getElementById("salary").value = data.salary;
     document.getElementById("description").value = data.description;
     document.getElementById("url").value = data.url;
@@ -74,6 +77,7 @@ async function main() {
     jobTitle: args.jobTitle ?? SAMPLE.jobTitle,
     company: args.company ?? SAMPLE.company,
     location: args.location ?? SAMPLE.location,
+    rto: args.rto ?? SAMPLE.rto,
     salary: args.salary ?? SAMPLE.salary,
     description: args.description ?? SAMPLE.description,
     url: args.url ?? SAMPLE.url,
@@ -105,6 +109,9 @@ async function main() {
     await page.setViewportSize({ width, height });
     const query = view === "standalone" ? "?standalone=1" : "";
     await page.goto(`chrome-extension://${extensionId}/popup.html${query}`);
+    // Let popup.js's async init() finish first — it settles on the no-config or
+    // loading state, and filling before that would be overwritten.
+    await page.waitForTimeout(800);
     await fillForm(page, data);
     await page.waitForTimeout(200);
     await page.screenshot({ path: outPath });
